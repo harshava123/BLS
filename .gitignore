@@ -1,0 +1,72 @@
+# Logs
+client/logs
+server/logs
+client/*.log
+server/*.log
+client/npm-debug.log*
+server/npm-debug.log*
+client/yarn-debug.log*
+server/yarn-debug.log*
+client/yarn-error.log*
+server/yarn-error.log*
+client/pnpm-debug.log*
+server/pnpm-debug.log*
+client/lerna-debug.log*
+server/lerna-debug.log*
+
+# Node modules
+client/node_modules
+server/node_modules
+
+# Build output
+client/dist
+server/dist
+client/dist-ssr
+server/dist-ssr
+
+# Local config
+client/*.local
+server/*.local
+
+# Environment files
+client/.env
+client/.env.local
+client/.env.production
+client/.env.development
+server/.env
+server/.env.local
+server/.env.production
+server/.env.development
+server/.env.*
+
+# Editor directories and files
+client/.vscode/*
+!client/.vscode/extensions.json
+server/.vscode/*
+!server/.vscode/extensions.json
+client/.idea
+server/.idea
+client/.DS_Store
+server/.DS_Store
+client/*.suo
+server/*.suo
+client/*.ntvs*
+server/*.ntvs*
+client/*.njsproj
+server/*.njsproj
+client/*.sln
+server/*.sln
+client/*.sw?
+server/*.sw?
+
+# OS generated files
+client/Thumbs.db
+server/Thumbs.db
+client/ehthumbs.db
+server/ehthumbs.db
+client/Desktop.ini
+server/Desktop.ini
+
+# Deployment files (optional - you might want to keep these)
+# client/render.yaml
+# server/render.yaml
