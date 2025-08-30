@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -128,6 +129,12 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
                   if (tab.id === "reports") {
                     setIsCollapsed(true);
                     localStorage.setItem('sidebar_collapsed', 'true');
+                  } else {
+                    // Auto-expand sidebar for other tabs for better navigation
+                    if (isCollapsed) {
+                      setIsCollapsed(false);
+                      localStorage.setItem('sidebar_collapsed', 'false');
+                    }
                   }
                 }}
                 className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -138,7 +145,14 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
                 title={isCollapsed ? tab.label : ""}
               >
                 <IconComponent className="w-4 h-4" />
-                {!isCollapsed && tab.label}
+                {!isCollapsed && (
+                  <div className="flex items-center gap-2">
+                    <span>{tab.label}</span>
+                    {tab.id === "reports" && (
+                      <Info className="w-3 h-3 text-blue-500" title="Auto-collapses sidebar for better view" />
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
