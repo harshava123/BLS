@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import Sidebar from "@/components/layout/Sidebar";
+import LocationBookings from "./LocationBookings";
 import { Package, FileText, Calendar, Truck, BarChart3, Search, MapPin, AlertTriangle, Plus, X, Copy, User } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -58,12 +59,14 @@ export default function Agent() {
     from_location: {
       location_id: "default_hyderabad",
       name: "HYDERABAD",
-      code: "HYD"
+      code: "HYD",
+      address: "Hyderabad, Telangana, India"
     },
     to_location: {
       location_id: "",
       name: "",
-      code: ""
+      code: "",
+      address: ""
     },
     sender: {
       customer_id: "",
@@ -358,7 +361,8 @@ export default function Agent() {
                     from_location: {
                       location_id: agentLocationData._id,
                       name: agentLocationData.name.toUpperCase(),
-                      code: agentLocationData.code
+                      code: agentLocationData.code,
+                      address: agentLocationData.address || ''
                     }
                   }));
                   console.log('✅ From location recovered:', agentLocationData);
@@ -607,12 +611,14 @@ export default function Agent() {
             from_location: {
               location_id: currentFromLocation.location_id || "",
               name: currentFromLocation.name || "",
-              code: currentFromLocation.code || ""
+              code: currentFromLocation.code || "",
+              address: currentFromLocation.address || ""
             },
             to_location: {
               location_id: "",
               name: "",
-              code: ""
+              code: "",
+              address: ""
             },
             sender: {
               customer_id: "",
@@ -846,7 +852,8 @@ export default function Agent() {
             from_location: {
               location_id: "default_hyderabad",
               name: "HYDERABAD",
-              code: "HYD"
+              code: "HYD",
+              address: "Hyderabad, Telangana, India"
             }
           }));
           return;
@@ -876,13 +883,14 @@ export default function Agent() {
               const agentLocationData = locations.find(loc => loc.name === locationName);
               
               if (agentLocationData) {
-                // Set from_location with proper location data
+                // Set from_location with proper location data including address
                 setBookingData(prev => ({
                   ...prev,
                   from_location: {
                     location_id: agentLocationData._id,
                     name: agentLocationData.name.toUpperCase(),
-                    code: agentLocationData.code
+                    code: agentLocationData.code,
+                    address: agentLocationData.address || ''
                   }
                 }));
                 console.log('From location set to:', agentLocationData);
@@ -900,7 +908,8 @@ export default function Agent() {
                     from_location: {
                       location_id: fallbackLocation._id,
                       name: fallbackLocation.name.toUpperCase(),
-                      code: fallbackLocation.code
+                      code: fallbackLocation.code,
+                      address: fallbackLocation.address || ''
                     }
                   }));
                   setAgentLocation("Hyderabad (HYD)"); // Update UI to show fallback
@@ -924,7 +933,8 @@ export default function Agent() {
                       from_location: {
                         location_id: hyderabadLocation._id,
                         name: hyderabadLocation.name.toUpperCase(),
-                        code: hyderabadLocation.code
+                        code: hyderabadLocation.code,
+                        address: hyderabadLocation.address || ''
                       }
                     }));
                     setAgentLocation("Hyderabad (HYD)");
@@ -1456,7 +1466,8 @@ export default function Agent() {
                                   to_location: {
                                     location_id: location._id,
                                     name: location.name.toUpperCase(),
-                                    code: location.code
+                                    code: location.code,
+                                    address: location.address || ''
                                   }
                                 }));
                                 setSearchQuery(null);
@@ -1467,7 +1478,8 @@ export default function Agent() {
                                   to_location: {
                                     location_id: location._id,
                                     name: location.name.toUpperCase(),
-                                    code: location.code
+                                    code: location.code,
+                                    address: location.address || ''
                                   }
                                 }));
                                 setSearchQuery(null);
@@ -2415,6 +2427,11 @@ export default function Agent() {
           </div>
         )}
 
+        {/* Location Bookings Tab */}
+        {activeTab === "location-bookings" && (
+          <LocationBookings />
+        )}
+
         {/* Abstract Daily Booking Tab */}
         {activeTab === "abstract" && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -2723,6 +2740,7 @@ export default function Agent() {
         {/* Branch Address */}
         <div className="text-center text-xs mb-4">
           <div>Branch Address: {currentBooking?.from_location?.name} ({currentBooking?.from_location?.code})</div>
+          <div>{currentBooking?.from_location?.address || 'No address available'}</div>
           <div>Ph.No: 0-8919322489 , 9989674524</div>
         </div>
 
@@ -2759,8 +2777,14 @@ export default function Agent() {
             
             {/* Row 3: From/To Locations */}
             <tr>
-              <td className="border border-black p-2">From: {currentBooking?.from_location?.name} ({currentBooking?.from_location?.code})</td>
-              <td className="border border-black p-2">To: {currentBooking?.to_location?.name} ({currentBooking?.to_location?.code})</td>
+              <td className="border border-black p-2">
+                From: {currentBooking?.from_location?.name} ({currentBooking?.from_location?.code})
+                <div className="text-xs mt-1">{currentBooking?.from_location?.address || 'No address'}</div>
+              </td>
+              <td className="border border-black p-2">
+                To: {currentBooking?.to_location?.name} ({currentBooking?.to_location?.code})
+                <div className="text-xs mt-1">{currentBooking?.to_location?.address || 'No address'}</div>
+              </td>
               <td className="border border-black p-2"></td>
             </tr>
             
@@ -2831,7 +2855,10 @@ export default function Agent() {
         {/* Delivery Address */}
         <div className="text-xs mb-4 p-2 border border-black">
           <div>
-            <strong>Delivery at:</strong> {currentBooking?.to_location?.name} - {currentBooking?.receiver?.address} <strong>contact: {currentBooking?.receiver?.phone}, 8886648712</strong>
+            <strong>Delivery at:</strong> {currentBooking?.to_location?.name} ({currentBooking?.to_location?.code}) - {currentBooking?.to_location?.address || 'No address available'}
+          </div>
+          <div className="mt-1">
+            <strong>Receiver Details:</strong> {currentBooking?.receiver?.address} <strong>contact: {currentBooking?.receiver?.phone}, 8886648712</strong>
           </div>
         </div>
 

@@ -38,7 +38,12 @@ router.get('/:id', async (req, res) => {
 // Create new location
 router.post('/', async (req, res) => {
   try {
-    const { name, code, city_id } = req.body;
+    const { name, code, city_id, address } = req.body;
+    
+    // Debug logging
+    console.log('📍 Creating new location with data:', req.body);
+    console.log('📍 Address field value:', address);
+    console.log('📍 Address field type:', typeof address);
     
     // Check if location with same code already exists
     const existingLocation = await Location.findOne({ code: code.toUpperCase() });
@@ -56,13 +61,19 @@ router.post('/', async (req, res) => {
       name,
       code,
       city_id,
-      city_code: city.code
+      city_code: city.code,
+      address
     });
     
+    console.log('📍 Location object before save:', location);
+    
     const newLocation = await location.save();
+    console.log('📍 Location saved successfully:', newLocation);
+    
     const populatedLocation = await Location.findById(newLocation._id).populate('city_id', 'name code');
     res.status(201).json(populatedLocation);
   } catch (error) {
+    console.error('❌ Error creating location:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -70,7 +81,7 @@ router.post('/', async (req, res) => {
 // Update location
 router.put('/:id', async (req, res) => {
   try {
-    const { name, code, city_id, status } = req.body;
+    const { name, code, city_id, status, address } = req.body;
     
     // Check if code is being changed and if it conflicts with existing locations
     if (code) {

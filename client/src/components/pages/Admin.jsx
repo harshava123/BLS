@@ -50,8 +50,6 @@ export default function Admin() {
   const [masterDataTab, setMasterDataTab] = useState("add-city");
   
   // Edit states
-  const [editingCity, setEditingCity] = useState(null);
-  const [editingLocation, setEditingLocation] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(null);
   
   // Search debounce
@@ -297,141 +295,9 @@ export default function Admin() {
     }
   };
 
-  // Edit city
-  const handleEditCity = async (cityId, updatedData) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/cities/${cityId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
-      });
 
-      if (response.ok) {
-        // Immediately update UI by updating the city in state
-        setCities(prevCities => 
-          prevCities.map(city => 
-            city._id === cityId ? { ...city, ...updatedData } : city
-          )
-        );
-        showModal('Success', 'City updated successfully!', 'success');
-      } else {
-        const error = await response.json();
-        showModal('Error', `Error: ${error.message}`, 'error');
-      }
-    } catch (error) {
-      console.error('Error updating city:', error);
-      showModal('Error', 'Error updating city', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // Delete city
-  const handleDeleteCity = async (cityId) => {
-    showConfirmModal(
-      'Delete City',
-      'Are you sure you want to delete this city? This action cannot be undone.',
-      async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`${API_BASE_URL}/api/cities/${cityId}`, {
-            method: 'DELETE'
-          });
 
-          if (response.ok) {
-            // Immediately update UI by removing the city from state
-            setCities(prevCities => prevCities.filter(city => city._id !== cityId));
-            showModal('Success', 'City deleted successfully!', 'success');
-          } else {
-            const error = await response.json();
-            showModal('Error', `Error: ${error.message}`, 'error');
-          }
-        } catch (error) {
-          console.error('Error deleting city:', error);
-          showModal('Error', 'Error deleting city', 'error');
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
-  };
-
-  // Edit location
-  const handleEditLocation = async (locationId, updatedData) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/locations/${locationId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
-      });
-
-      if (response.ok) {
-        // Immediately update UI by updating the location in state
-        setLocationsData(prevLocations => 
-          prevLocations.map(location => 
-            location._id === locationId ? { ...location, ...updatedData } : location
-          )
-        );
-        // Also update the locations array for agent creation
-        setLocations(prevLocations => 
-          prevLocations.map(location => {
-            // Extract name from format "Name (CODE)" for comparison
-            const locationName = location.split(' (')[0];
-            return locationName === updatedData.name ? `${updatedData.name} (${updatedData.code})` : location;
-          })
-        );
-
-        showModal('Success', 'Location updated successfully!', 'success');
-      } else {
-        const error = await response.json();
-        showModal('Error', `Error: ${error.message}`, 'error');
-      }
-    } catch (error) {
-      console.error('Error updating location:', error);
-      showModal('Error', 'Error updating location', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete location
-  const handleDeleteLocation = async (locationId) => {
-    showConfirmModal(
-      'Delete Location',
-      'Are you sure you want to delete this location? This action cannot be undone.',
-      async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`${API_BASE_URL}/api/locations/${locationId}`, {
-            method: 'DELETE'
-          });
-
-          if (response.ok) {
-            // Find the location name before deleting to update the locations array
-            const locationToDelete = locationsData.find(loc => loc._id === locationId);
-            // Immediately update UI by removing the location from state
-            setLocationsData(prevLocations => prevLocations.filter(location => location._id !== locationId));
-            // Also remove from the locations array for agent creation
-            if (locationToDelete) {
-              const locationString = `${locationToDelete.name} (${locationToDelete.code})`;
-              setLocations(prevLocations => prevLocations.filter(location => location !== locationString));
-            }
-            showModal('Success', 'Location deleted successfully!', 'success');
-          } else {
-            const error = await response.json();
-            showModal('Error', `Error: ${error.message}`, 'error');
-          }
-        } catch (error) {
-          console.error('Error deleting location:', error);
-          showModal('Error', 'Error deleting location', 'error');
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
-  };
 
   // Edit customer
   const handleEditCustomer = async (customerId, updatedData) => {
@@ -1159,73 +1025,79 @@ export default function Admin() {
 
                     {/* Cities List */}
                     <div className="border-t pt-6">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Existing Cities ({cities.length})</h3>
-                      <div className="space-y-3">
-                        {cities.map((city) => (
-                          <div key={city._id} className="p-3 border rounded-lg bg-gray-50">
-                            {editingCity && editingCity._id === city._id ? (
-                              <div className="space-y-3">
-                                <Input
-                                  placeholder="City name"
-                                  value={editingCity.name}
-                                  onChange={(e) => setEditingCity({...editingCity, name: e.target.value})}
-                                  className="text-sm"
-                                />
-                                <Input
-                                  placeholder="City code (3 digits)"
-                                  value={editingCity.code}
-                                  onChange={(e) => setEditingCity({...editingCity, code: e.target.value.toUpperCase()})}
-                                  maxLength={3}
-                                  className="text-sm"
-                                />
-                                <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    className="text-xs bg-green-600 hover:bg-green-700"
-                                    onClick={() => {
-                                      handleEditCity(city._id, editingCity);
-                                      setEditingCity(null);
-                                    }}
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="text-xs"
-                                    onClick={() => setEditingCity(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="font-medium text-gray-900">{city.name.toUpperCase()}</div>
-                                                    <div className="text-sm text-gray-600">Code: {city.code.toUpperCase()}</div>
-                      <div className="flex gap-2 mt-3">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="text-xs"
-                                    onClick={() => setEditingCity(city)}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    className="text-xs"
-                                    onClick={() => handleDeleteCity(city._id)}
-                                  >
-                                    Delete
-                                  </Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-blue-600 text-sm">🏙️</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800">Existing Cities ({cities.length})</h3>
                       </div>
+                      
+                      {cities.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="text-2xl">🏙️</span>
+                          </div>
+                          <p className="text-gray-500 font-medium">No cities found</p>
+                          <p className="text-sm text-gray-400 mt-1">Add your first city above to get started</p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-gray-200 overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider">
+                                    City Details
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider">
+                                    Code
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider">
+                                    ID
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider">
+                                    Type
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {cities.map((city) => (
+                                  <tr key={city._id} className="hover:bg-blue-50/30 transition-colors duration-150">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                                          <span className="text-white font-bold text-xs">
+                                            {city.name.charAt(0).toUpperCase()}
+                                          </span>
+                                        </div>
+                                        <div className="ml-3">
+                                          <div className="text-sm font-semibold text-gray-900">{city.name.toUpperCase()}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                        {city.code.toUpperCase()}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-sm text-gray-600 font-mono">
+                                        {city._id.slice(-6)}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                        <MapPin className="w-3 h-3 mr-1.5" />
+                                        City
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1333,106 +1205,93 @@ export default function Admin() {
 
                     {/* Locations List */}
                     <div className="border-t pt-6">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Existing Locations ({locationsData.length})</h3>
-                      <div className="space-y-3">
-                        {locationsData.map((location) => (
-                          <div key={location._id} className="p-3 border rounded-lg bg-gray-50">
-                            {editingLocation && editingLocation._id === location._id ? (
-                              <div className="space-y-3">
-                                <Input
-                                  placeholder="Location name"
-                                  value={editingLocation.name}
-                                  onChange={(e) => setEditingLocation({...editingLocation, name: e.target.value})}
-                                  className="text-sm"
-                                />
-                                <Input
-                                  placeholder="Location code (3 digits)"
-                                  value={editingLocation.code}
-                                  onChange={(e) => setEditingLocation({...editingLocation, code: e.target.value.toUpperCase()})}
-                                  maxLength={3}
-                                  className="text-sm"
-                                />
-                                <Select
-                                  value={editingLocation.city_id}
-                                  onValueChange={(value) => {
-                                    const city = cities.find(c => c._id === value);
-                                    setEditingLocation({
-                                      ...editingLocation, 
-                                      city_id: value,
-                                      city_code: city?.code || ''
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="text-sm">
-                                    <SelectValue placeholder="Choose a city" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {cities.map((city) => (
-                                      <SelectItem key={city._id} value={city._id}>
-                                        {city.name.toUpperCase()} ({city.code.toUpperCase()})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Textarea
-                                  placeholder="Location address"
-                                  value={editingLocation.address || ''}
-                                  onChange={(e) => setEditingLocation({...editingLocation, address: e.target.value})}
-                                  className="text-sm"
-                                  rows={2}
-                                />
-                                <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    className="text-xs bg-green-600 hover:bg-green-700"
-                                    onClick={() => {
-                                      handleEditLocation(location._id, editingLocation);
-                                      setEditingLocation(null);
-                                    }}
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="text-xs"
-                                    onClick={() => setEditingLocation(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="font-medium text-gray-900">{location.name.toUpperCase()}</div>
-                                <div className="text-sm text-gray-600">Code: {location.code.toUpperCase()}</div>
-                                <div className="text-sm text-gray-600">City: {location.city_id?.name || 'N/A'}</div>
-                                {location.address && (
-                                  <div className="text-sm text-gray-600">Address: {location.address}</div>
-                                )}
-                                <div className="flex gap-2 mt-3">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="text-xs"
-                                    onClick={() => setEditingLocation(location)}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    className="text-xs"
-                                    onClick={() => handleDeleteLocation(location._id)}
-                                  >
-                                    Delete
-                                  </Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-600 text-sm">📍</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800">Existing Locations ({locationsData.length})</h3>
                       </div>
+                      
+                      {locationsData.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="text-2xl">📍</span>
+                          </div>
+                          <p className="text-gray-500 font-medium">No locations found</p>
+                          <p className="text-sm text-gray-400 mt-1">Add your first location above to get started</p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-gray-200 overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-green-700 uppercase tracking-wider">
+                                    Location Details
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-green-700 uppercase tracking-wider">
+                                    Code
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-green-700 uppercase tracking-wider">
+                                    City
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-green-700 uppercase tracking-wider">
+                                    Address
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-green-700 uppercase tracking-wider">
+                                    Type
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {locationsData.map((location) => (
+                                  <tr key={location._id} className="hover:bg-green-50/30 transition-colors duration-150">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                                          <span className="text-white font-bold text-xs">
+                                            {location.name.charAt(0).toUpperCase()}
+                                          </span>
+                                        </div>
+                                        <div className="ml-3">
+                                          <div className="text-sm font-semibold text-gray-900">{location.name.toUpperCase()}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                        {location.code.toUpperCase()}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-sm text-gray-900">
+                                        {location.city_id?.name ? (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                            {location.city_id.name.toUpperCase()}
+                                          </span>
+                                        ) : (
+                                          <span className="text-gray-500">N/A</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-sm text-gray-600 max-w-[200px] truncate" title={location.address || 'No address'}>
+                                        {location.address || 'No address'}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
+                                        <MapPin className="w-3 h-3 mr-1.5" />
+                                        Location
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -42,6 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
 
   const navigationTabs = [
     { id: "booking", label: "Booking", icon: Package },
+    { id: "location-bookings", label: "Location Bookings", icon: FileText },
     { id: "loading", label: "Loading Sheet", icon: FileText },
     { id: "upcoming", label: "Upcoming", icon: Calendar },
     { id: "delivery", label: "Delivery", icon: Truck },
@@ -126,7 +127,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
                 )}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  if (tab.id === "reports") {
+                  if (tab.id === "reports" || tab.id === "location-bookings") {
                     setIsCollapsed(true);
                     localStorage.setItem('sidebar_collapsed', 'true');
                   } else if (isCollapsed) {

@@ -4,14 +4,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Filter, Package } from "lucide-react";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Download, Filter, Package, MapPin, User, Truck, Calendar, Edit } from "lucide-react";
 import { API_BASE_URL } from "@/config";
+import { cn } from "@/lib/utils";
 
 export default function Reports() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [agents, setAgents] = useState([]);
+  
+  // Edit booking state
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -197,6 +211,130 @@ export default function Reports() {
     window.URL.revokeObjectURL(url);
   };
 
+  // Handle edit booking - enters edit mode
+  const handleEditBooking = (booking) => {
+    console.log('📝 Entering edit mode for booking:', booking._id);
+    setEditingBooking(booking);
+    setEditValue('');
+  };
+
+  // Handle edit field
+  const handleEditField = (booking, field, value) => {
+    if (editingBooking?._id === booking._id) {
+      setEditingField(field);
+      setEditValue(value);
+    }
+  };
+
+  // Update field value in state
+  const updateFieldValue = (bookingId, field, value) => {
+    // Update in main bookings array
+    const updatedBookings = bookings.map(b => 
+      b._id === bookingId 
+        ? { ...b, [field]: value }
+        : b
+    );
+    setBookings(updatedBookings);
+    
+    // Update in filtered bookings array
+    const updatedFilteredBookings = filteredBookings.map(b => 
+      b._id === bookingId 
+        ? { ...b, [field]: value }
+        : b
+    );
+    setFilteredBookings(updatedFilteredBookings);
+  };
+
+  // Save edited field
+  const handleSaveField = async (booking, field, value) => {
+    try {
+      console.log('💾 Saving field:', field, 'with value:', value, 'for booking:', booking._id);
+      
+      // Update the booking in state immediately for UI responsiveness
+      const updatedBookings = bookings.map(b => 
+        b._id === booking._id 
+          ? { ...b, [field]: value }
+          : b
+      );
+      setBookings(updatedBookings);
+      
+      // Update filtered bookings as well
+      const updatedFilteredBookings = filteredBookings.map(b => 
+        b._id === booking._id 
+          ? { ...b, [field]: value }
+          : b
+      );
+      setFilteredBookings(updatedFilteredBookings);
+      
+      // Clear editing state
+      setEditingField(null);
+      setEditValue('');
+      
+      alert(`Field ${field} updated successfully!`);
+    } catch (error) {
+      console.error('❌ Error saving field:', error);
+      alert(`Error saving: ${error.message}`);
+    }
+  };
+
+  // Save all changes to database
+  const handleSaveAllChanges = async (booking) => {
+    try {
+      console.log('💾 Saving all changes for booking:', booking._id);
+      
+      // Get the updated booking data from state
+      const updatedBooking = bookings.find(b => b._id === booking._id);
+      if (!updatedBooking) {
+        throw new Error('Updated booking not found in state');
+      }
+
+      // Prepare the data to send to API
+      const updateData = {
+        lr_number: updatedBooking.lr_number,
+        status: updatedBooking.status,
+        // Add more fields as needed
+      };
+
+      console.log('📤 Sending update data:', updateData);
+
+      // Call API to update booking in database
+      const response = await fetch(`${API_BASE_URL}/api/bookings/${booking._id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update booking');
+      }
+
+      const result = await response.json();
+      console.log('✅ Booking updated successfully:', result);
+
+      // Clear editing state
+      setEditingBooking(null);
+      setEditingField(null);
+      setEditValue('');
+
+      alert('Booking updated successfully in database!');
+      
+    } catch (error) {
+      console.error('❌ Error saving to database:', error);
+      alert(`Error saving to database: ${error.message}`);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingBooking(null);
+    setEditingField(null);
+    setEditValue('');
+  };
+
   // Load bookings, locations, and agents on component mount
   useEffect(() => {
     fetchBookings();
@@ -349,70 +487,7 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Bookings</p>
-                  <p className="text-2xl font-bold text-gray-900">{filteredBookings.length}</p>
-                </div>
-                <Package className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    ₹{filteredBookings.reduce((sum, booking) => sum + (parseFloat(booking.charges?.total_amount) || 0), 0).toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-lg">₹</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Agents</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {new Set(filteredBookings.map(b => b.agent_name).filter(Boolean)).size}
-                  </p>
-                </div>
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 text-lg">👤</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avg. Freight</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    ₹{filteredBookings.length > 0 ? 
-                      (filteredBookings.reduce((sum, booking) => sum + (parseFloat(booking.items?.[0]?.freight_charge) || 0), 0) / filteredBookings.length).toFixed(0) : 
-                      0}
-                  </p>
-                </div>
-                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                  <span className="text-orange-600 text-lg">📦</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Bookings Table */}
         <Card>
@@ -433,105 +508,208 @@ export default function Reports() {
                 <p className="text-gray-500">No bookings found matching the current filters.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">LR Number</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Date</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Agent</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">From → To</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Sender</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Receiver</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Material</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Qty/Weight</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Freight</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Charges</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Total</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredBookings.map((booking) => (
-                      <tr key={booking._id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          {booking.lr_number || "N/A"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {new Date(booking.createdAt || booking.date).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            {booking.agent_name || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs">
-                              {(booking.from_location?.name || "N/A").toUpperCase()} → {(booking.to_location?.name || "N/A").toUpperCase()}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 max-w-32 truncate">
-                          <div className="text-xs">
-                            <div className="font-medium">{booking.sender?.name || "N/A"}</div>
-                            <div>{booking.sender?.phone || "N/A"}</div>
-                            <div>{booking.sender?.gst_number || "N/A"}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 max-w-32 truncate">
-                          <div className="text-xs">
-                            <div className="font-medium">{booking.receiver?.name || "N/A"}</div>
-                            <div>{booking.receiver?.phone || "N/A"}</div>
-                            <div>{booking.receiver?.gst_number || "N/A"}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 max-w-24 truncate">
-                          <div className="text-xs">
-                            <div>{booking.items?.[0]?.description || "N/A"}</div>
-                            <div className="text-gray-500">N/A</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          <div className="text-xs">
-                            <div>Qty: {booking.items?.[0]?.quantity || "N/A"}</div>
-                            <div>Wt: {booking.items?.[0]?.weight || "N/A"}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          <div className="text-xs">
-                            <div>₹{parseFloat(booking.items?.[0]?.freight_charge || 0).toLocaleString()}</div>
-                            <div className="text-gray-500">Invoice: N/A</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          <div className="text-xs space-y-1">
-                            <div>LR: ₹{parseFloat(booking.charges?.lr_charges || 0).toLocaleString()}</div>
-                            <div>Handling: ₹{parseFloat(booking.charges?.handling_charges || 0).toLocaleString()}</div>
-                            <div>Pickup: ₹{parseFloat(booking.charges?.pickup_charges || 0).toLocaleString()}</div>
-                            <div>Door: ₹{parseFloat(booking.charges?.door_delivery_charges || 0).toLocaleString()}</div>
-                            <div>Others: ₹{parseFloat(booking.charges?.other_charges || 0).toLocaleString()}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          ₹{parseFloat(booking.charges?.total_amount || 0).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            booking.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                            booking.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
-                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            booking.status === 'unloaded' ? 'bg-orange-100 text-orange-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {booking.status || 'booked'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="rounded-md border overflow-hidden">
+                <div className="overflow-x-auto max-w-full">
+                  <Table className="min-w-full">
+                                         <TableHeader>
+                       <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">LR</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Date</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Agent</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">Route</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-28">Sender</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-28">Receiver</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Material</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Qty/Wt</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Freight</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Total</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Status</TableHead>
+                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Actions</TableHead>
+                       </TableRow>
+                     </TableHeader>
+                                         <TableBody className="bg-white divide-y divide-gray-200">
+                                              {filteredBookings.map((booking) => (
+                         <TableRow key={booking._id} className="hover:bg-gray-50/50 transition-colors duration-150">
+                           <TableCell className="px-2 py-2 font-medium text-gray-900 text-xs">
+                             {editingBooking?._id === booking._id && editingField === 'lr_number' ? (
+                               <div className="flex items-center gap-1">
+                                 <Input
+                                   value={editValue}
+                                   onChange={(e) => setEditValue(e.target.value)}
+                                   className="h-6 px-1 text-xs"
+                                   autoFocus
+                                 />
+                                 <button
+                                   onClick={() => {
+                                     updateFieldValue(booking._id, 'lr_number', editValue);
+                                     setEditingField(null);
+                                     setEditValue('');
+                                   }}
+                                   className="h-5 w-5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                 >
+                                   ✓
+                                 </button>
+                                 <button
+                                   onClick={handleCancelEdit}
+                                   className="h-5 w-5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                                 >
+                                   ✕
+                                 </button>
+                               </div>
+                             ) : (
+                               <div 
+                                 className="cursor-pointer hover:bg-blue-50 px-1 rounded"
+                                 onClick={() => handleEditField(booking, 'lr_number', booking.lr_number || '')}
+                                 title="Click to edit"
+                               >
+                                 {booking.lr_number || "N/A"}
+                               </div>
+                             )}
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600 text-xs">
+                             {new Date(booking.createdAt || booking.date).toLocaleDateString()}
+                           </TableCell>
+                           <TableCell className="px-2 py-2">
+                             <div className="flex items-center gap-1">
+                               <User className="w-3 h-3 text-purple-600" />
+                               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 truncate max-w-16">
+                                 {booking.agent_name || "N/A"}
+                               </span>
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2">
+                             <div className="flex items-center gap-1">
+                               <MapPin className="w-3 h-3 text-blue-600" />
+                               <div className="text-xs">
+                                 <div className="font-medium text-gray-900 truncate max-w-24">
+                                   {(booking.from_location?.name || "N/A").toUpperCase()}
+                                 </div>
+                                 <div className="text-gray-500 text-center">→</div>
+                                 <div className="font-medium text-gray-900 truncate max-w-24">
+                                   {(booking.to_location?.name || "N/A").toUpperCase()}
+                                 </div>
+                               </div>
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600">
+                             <div className="text-xs">
+                               <div className="font-medium truncate max-w-20">{booking.sender?.name || "N/A"}</div>
+                               <div className="truncate max-w-20">{booking.sender?.phone || "N/A"}</div>
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600">
+                             <div className="text-xs">
+                               <div className="font-medium truncate max-w-20">{booking.receiver?.name || "N/A"}</div>
+                               <div className="truncate max-w-20">{booking.receiver?.phone || "N/A"}</div>
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600">
+                             <div className="text-xs truncate max-w-16" title={booking.items?.[0]?.description || "N/A"}>
+                               {booking.items?.[0]?.description || "N/A"}
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600">
+                             <div className="text-xs">
+                               <div>Qty: {booking.items?.[0]?.quantity || "N/A"}</div>
+                               <div>Wt: {booking.items?.[0]?.weight || "N/A"}</div>
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 text-gray-600">
+                             <div className="text-xs">
+                               ₹{parseFloat(booking.items?.[0]?.freight_charge || 0).toLocaleString()}
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2 font-medium text-gray-900">
+                             <div className="text-xs">
+                               ₹{parseFloat(booking.charges?.total_amount || 0).toLocaleString()}
+                             </div>
+                           </TableCell>
+                           <TableCell className="px-2 py-2">
+                             {editingBooking?._id === booking._id && editingField === 'status' ? (
+                               <div className="flex items-center gap-1">
+                                 <Select value={editValue} onValueChange={setEditValue}>
+                                   <SelectTrigger className="h-6 px-1 text-xs">
+                                     <SelectValue />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     <SelectItem value="booked">Booked</SelectItem>
+                                     <SelectItem value="in_transit">In Transit</SelectItem>
+                                     <SelectItem value="unloaded">Unloaded</SelectItem>
+                                     <SelectItem value="delivered">Delivered</SelectItem>
+                                     <SelectItem value="cancelled">Cancelled</SelectItem>
+                                     <SelectItem value="rejected">Rejected</SelectItem>
+                                   </SelectContent>
+                                 </Select>
+                                 <button
+                                   onClick={() => {
+                                     updateFieldValue(booking._id, 'status', editValue);
+                                     setEditingField(null);
+                                     setEditValue('');
+                                   }}
+                                   className="h-5 w-5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                 >
+                                   ✓
+                                 </button>
+                                 <button
+                                   onClick={handleCancelEdit}
+                                   className="h-5 w-5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                                 >
+                                   ✕
+                                 </button>
+                               </div>
+                             ) : (
+                               <div 
+                                 className="cursor-pointer hover:bg-blue-50 px-1 rounded"
+                                 onClick={() => handleEditField(booking, 'status', booking.status || 'booked')}
+                                 title="Click to edit"
+                               >
+                                 <span className={cn(
+                                   "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium",
+                                   booking.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                   booking.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                                   booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                   booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                   booking.status === 'unloaded' ? 'bg-orange-100 text-orange-800' :
+                                   'bg-yellow-100 text-yellow-800'
+                                 )}>
+                                   {booking.status || 'booked'}
+                                 </span>
+                               </div>
+                             )}
+                           </TableCell>
+                           <TableCell className="px-2 py-2">
+                             <div className="flex items-center gap-1">
+                               {editingBooking?._id === booking._id ? (
+                                 <div className="flex items-center gap-1">
+                                   <button
+                                     onClick={() => handleSaveAllChanges(booking)}
+                                     className="h-6 px-2 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                                   >
+                                     ✓ Save
+                                   </button>
+                                   <button
+                                     onClick={handleCancelEdit}
+                                     className="h-6 px-2 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                                   >
+                                     ✕ Cancel
+                                   </button>
+                                 </div>
+                               ) : (
+                                 <button
+                                   onClick={() => handleEditBooking(booking)}
+                                   className="h-6 px-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                 >
+                                   <Edit className="w-3 h-3 mr-1 inline" />
+                                   Edit
+                                 </button>
+                               )}
+                             </div>
+                           </TableCell>
+                         </TableRow>
+                       ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
           </CardContent>
