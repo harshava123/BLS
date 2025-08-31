@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Download, Filter, Package, MapPin, User, Truck, Calendar, Edit } from "lucide-react";
+import { Download, Filter, Package, MapPin, User, Truck, Calendar } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +22,7 @@ export default function Reports() {
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [agents, setAgents] = useState([]);
   
-  // Edit booking state
-  const [editingBooking, setEditingBooking] = useState(null);
-  const [editingField, setEditingField] = useState(null);
-  const [editValue, setEditValue] = useState('');
+
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -211,129 +208,7 @@ export default function Reports() {
     window.URL.revokeObjectURL(url);
   };
 
-  // Handle edit booking - enters edit mode
-  const handleEditBooking = (booking) => {
-    console.log('📝 Entering edit mode for booking:', booking._id);
-    setEditingBooking(booking);
-    setEditValue('');
-  };
 
-  // Handle edit field
-  const handleEditField = (booking, field, value) => {
-    if (editingBooking?._id === booking._id) {
-      setEditingField(field);
-      setEditValue(value);
-    }
-  };
-
-  // Update field value in state
-  const updateFieldValue = (bookingId, field, value) => {
-    // Update in main bookings array
-    const updatedBookings = bookings.map(b => 
-      b._id === bookingId 
-        ? { ...b, [field]: value }
-        : b
-    );
-    setBookings(updatedBookings);
-    
-    // Update in filtered bookings array
-    const updatedFilteredBookings = filteredBookings.map(b => 
-      b._id === bookingId 
-        ? { ...b, [field]: value }
-        : b
-    );
-    setFilteredBookings(updatedFilteredBookings);
-  };
-
-  // Save edited field
-  const handleSaveField = async (booking, field, value) => {
-    try {
-      console.log('💾 Saving field:', field, 'with value:', value, 'for booking:', booking._id);
-      
-      // Update the booking in state immediately for UI responsiveness
-      const updatedBookings = bookings.map(b => 
-        b._id === booking._id 
-          ? { ...b, [field]: value }
-          : b
-      );
-      setBookings(updatedBookings);
-      
-      // Update filtered bookings as well
-      const updatedFilteredBookings = filteredBookings.map(b => 
-        b._id === booking._id 
-          ? { ...b, [field]: value }
-          : b
-      );
-      setFilteredBookings(updatedFilteredBookings);
-      
-      // Clear editing state
-      setEditingField(null);
-      setEditValue('');
-      
-      alert(`Field ${field} updated successfully!`);
-    } catch (error) {
-      console.error('❌ Error saving field:', error);
-      alert(`Error saving: ${error.message}`);
-    }
-  };
-
-  // Save all changes to database
-  const handleSaveAllChanges = async (booking) => {
-    try {
-      console.log('💾 Saving all changes for booking:', booking._id);
-      
-      // Get the updated booking data from state
-      const updatedBooking = bookings.find(b => b._id === booking._id);
-      if (!updatedBooking) {
-        throw new Error('Updated booking not found in state');
-      }
-
-      // Prepare the data to send to API
-      const updateData = {
-        lr_number: updatedBooking.lr_number,
-        status: updatedBooking.status,
-        // Add more fields as needed
-      };
-
-      console.log('📤 Sending update data:', updateData);
-
-      // Call API to update booking in database
-      const response = await fetch(`${API_BASE_URL}/api/bookings/${booking._id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update booking');
-      }
-
-      const result = await response.json();
-      console.log('✅ Booking updated successfully:', result);
-
-      // Clear editing state
-      setEditingBooking(null);
-      setEditingField(null);
-      setEditValue('');
-
-      alert('Booking updated successfully in database!');
-      
-    } catch (error) {
-      console.error('❌ Error saving to database:', error);
-      alert(`Error saving to database: ${error.message}`);
-    }
-  };
-
-  // Cancel editing
-  const handleCancelEdit = () => {
-    setEditingBooking(null);
-    setEditingField(null);
-    setEditValue('');
-  };
 
   // Load bookings, locations, and agents on component mount
   useEffect(() => {
@@ -524,47 +399,14 @@ export default function Reports() {
                          <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Freight</TableHead>
                          <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Total</TableHead>
                          <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Status</TableHead>
-                         <TableHead className="px-2 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">Actions</TableHead>
+
                        </TableRow>
                      </TableHeader>
                                          <TableBody className="bg-white divide-y divide-gray-200">
                                               {filteredBookings.map((booking) => (
                          <TableRow key={booking._id} className="hover:bg-gray-50/50 transition-colors duration-150">
                            <TableCell className="px-2 py-2 font-medium text-gray-900 text-xs">
-                             {editingBooking?._id === booking._id && editingField === 'lr_number' ? (
-                               <div className="flex items-center gap-1">
-                                 <Input
-                                   value={editValue}
-                                   onChange={(e) => setEditValue(e.target.value)}
-                                   className="h-6 px-1 text-xs"
-                                   autoFocus
-                                 />
-                                 <button
-                                   onClick={() => {
-                                     updateFieldValue(booking._id, 'lr_number', editValue);
-                                     setEditingField(null);
-                                     setEditValue('');
-                                   }}
-                                   className="h-5 w-5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-                                 >
-                                   ✓
-                                 </button>
-                                 <button
-                                   onClick={handleCancelEdit}
-                                   className="h-5 w-5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                                 >
-                                   ✕
-                                 </button>
-                               </div>
-                             ) : (
-                               <div 
-                                 className="cursor-pointer hover:bg-blue-50 px-1 rounded"
-                                 onClick={() => handleEditField(booking, 'lr_number', booking.lr_number || '')}
-                                 title="Click to edit"
-                               >
-                                 {booking.lr_number || "N/A"}
-                               </div>
-                             )}
+                             {booking.lr_number || "N/A"}
                            </TableCell>
                            <TableCell className="px-2 py-2 text-gray-600 text-xs">
                              {new Date(booking.createdAt || booking.date).toLocaleDateString()}
@@ -625,86 +467,19 @@ export default function Reports() {
                              </div>
                            </TableCell>
                            <TableCell className="px-2 py-2">
-                             {editingBooking?._id === booking._id && editingField === 'status' ? (
-                               <div className="flex items-center gap-1">
-                                 <Select value={editValue} onValueChange={setEditValue}>
-                                   <SelectTrigger className="h-6 px-1 text-xs">
-                                     <SelectValue />
-                                   </SelectTrigger>
-                                   <SelectContent>
-                                     <SelectItem value="booked">Booked</SelectItem>
-                                     <SelectItem value="in_transit">In Transit</SelectItem>
-                                     <SelectItem value="unloaded">Unloaded</SelectItem>
-                                     <SelectItem value="delivered">Delivered</SelectItem>
-                                     <SelectItem value="cancelled">Cancelled</SelectItem>
-                                     <SelectItem value="rejected">Rejected</SelectItem>
-                                   </SelectContent>
-                                 </Select>
-                                 <button
-                                   onClick={() => {
-                                     updateFieldValue(booking._id, 'status', editValue);
-                                     setEditingField(null);
-                                     setEditValue('');
-                                   }}
-                                   className="h-5 w-5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-                                 >
-                                   ✓
-                                 </button>
-                                 <button
-                                   onClick={handleCancelEdit}
-                                   className="h-5 w-5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                                 >
-                                   ✕
-                                 </button>
-                               </div>
-                             ) : (
-                               <div 
-                                 className="cursor-pointer hover:bg-blue-50 px-1 rounded"
-                                 onClick={() => handleEditField(booking, 'status', booking.status || 'booked')}
-                                 title="Click to edit"
-                               >
-                                 <span className={cn(
-                                   "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium",
-                                   booking.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                   booking.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
-                                   booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                   booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                   booking.status === 'unloaded' ? 'bg-orange-100 text-orange-800' :
-                                   'bg-yellow-100 text-yellow-800'
-                                 )}>
-                                   {booking.status || 'booked'}
-                                 </span>
-                               </div>
-                             )}
+                             <span className={cn(
+                               "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium",
+                               booking.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                               booking.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                               booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                               booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                               booking.status === 'unloaded' ? 'bg-orange-100 text-orange-800' :
+                               'bg-yellow-100 text-yellow-800'
+                             )}>
+                               {booking.status || 'booked'}
+                             </span>
                            </TableCell>
-                           <TableCell className="px-2 py-2">
-                             <div className="flex items-center gap-1">
-                               {editingBooking?._id === booking._id ? (
-                                 <div className="flex items-center gap-1">
-                                   <button
-                                     onClick={() => handleSaveAllChanges(booking)}
-                                     className="h-6 px-2 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-                                   >
-                                     ✓ Save
-                                   </button>
-                                   <button
-                                     onClick={handleCancelEdit}
-                                     className="h-6 px-2 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                                   >
-                                     ✕ Cancel
-                                   </button>
-                                 </div>
-                               ) : (
-                                 <button
-                                   onClick={() => handleEditBooking(booking)}
-                                   className="h-6 px-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                                 >
-                                   <Edit className="w-3 h-3 mr-1 inline" />
-                                   Edit
-                                 </button>
-                               )}
-                             </div>
-                           </TableCell>
+
                          </TableRow>
                        ))}
                     </TableBody>

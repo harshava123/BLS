@@ -2432,6 +2432,20 @@ export default function Agent() {
           <LocationBookings />
         )}
 
+        {/* Reports Tab - Location-specific reports for agent */}
+        {activeTab === "reports" && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center mb-6">
+              <div className="bg-blue-200 px-4 py-2 rounded mr-4">
+                <span className="text-blue-800 font-bold text-sm">LOCATION REPORTS</span>
+              </div>
+              <span className="text-gray-600 text-sm">Reports for {agentLocation}</span>
+            </div>
+            
+            <LocationBookings showReports={true} />
+          </div>
+        )}
+
         {/* Abstract Daily Booking Tab */}
         {activeTab === "abstract" && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">

@@ -20,13 +20,23 @@ import {
   User,
   Package,
   Calendar,
-  Truck
+  Truck,
+  BarChart3,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001';
+const API_BASE_URL = 'http://localhost:8001';
 
-export default function LocationBookings() {
+export default function LocationBookings({ showReports = false }) {
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +64,17 @@ export default function LocationBookings() {
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
-          if (profileData.user && profileData.user.location) {
-            const locationName = profileData.user.location.split(' (')[0];
-            setAgentLocation(locationName);
-            
-            // Fetch all bookings from this location
-            await fetchLocationBookings(locationName);
-          }
+                  if (profileData.user && profileData.user.location) {
+          const locationName = profileData.user.location.split(' (')[0];
+          console.log('📍 Agent location from profile:', profileData.user.location);
+          console.log('📍 Extracted location name:', locationName);
+          setAgentLocation(locationName);
+          
+          // Fetch all bookings from this location
+          await fetchLocationBookings(locationName);
+        } else {
+          console.log('⚠️ No location found in agent profile:', profileData.user);
+        }
         }
       } catch (error) {
         console.error('Error fetching agent location:', error);
@@ -75,20 +89,91 @@ export default function LocationBookings() {
   const fetchLocationBookings = async (locationName) => {
     try {
       console.log('🔍 Fetching bookings for location:', locationName);
+      console.log('🔍 API URL:', `${API_BASE_URL}/api/bookings`);
+      
       const response = await fetch(`${API_BASE_URL}/api/bookings`);
+      console.log('📡 Response status:', response.status);
+      
       if (response.ok) {
         const allBookings = await response.json();
         console.log('📊 Total bookings fetched:', allBookings.length);
         
+        // Log sample booking structure
+        if (allBookings.length > 0) {
+          console.log('📋 Sample booking structure:', {
+            lr_number: allBookings[0].lr_number,
+            from_location: allBookings[0].from_location,
+            to_location: allBookings[0].to_location,
+            agent_location: allBookings[0].agent_location,
+            status: allBookings[0].status
+          });
+        }
+        
         // Filter bookings by location (both from and to)
-        const locationBookings = allBookings.filter(booking => 
-          (booking.from_location?.name === locationName || 
-           booking.to_location?.name === locationName) ||
-          booking.agent_location === locationName
-        );
+        const locationBookings = allBookings.filter(booking => {
+          const fromLocation = booking.from_location?.name;
+          const toLocation = booking.to_location?.name;
+          const agentLocation = booking.agent_location;
+          
+          // Normalize location names for comparison (remove codes, trim, lowercase)
+          const normalizeLocation = (loc) => {
+            if (!loc) return '';
+            return loc.split(' (')[0].trim().toLowerCase();
+          };
+          
+          const normalizedAgentLocation = normalizeLocation(locationName);
+          const normalizedFromLocation = normalizeLocation(fromLocation);
+          const normalizedToLocation = normalizeLocation(toLocation);
+          const normalizedAgentLocationField = normalizeLocation(agentLocation);
+          
+          // Check if any of the location fields match the agent's assigned location
+          const isLocationMatch = 
+            normalizedFromLocation === normalizedAgentLocation || 
+            normalizedToLocation === normalizedAgentLocation || 
+            normalizedAgentLocationField === normalizedAgentLocation ||
+            // Fallback: Check if the agent's location is contained in any of the location fields
+            (fromLocation && fromLocation.toLowerCase().includes(locationName.toLowerCase())) ||
+            (toLocation && toLocation.toLowerCase().includes(locationName.toLowerCase())) ||
+            (agentLocation && agentLocation.toLowerCase().includes(locationName.toLowerCase()));
+          
+          // Debug logging for first few bookings
+          if (allBookings.indexOf(booking) < 3) {
+            console.log('🔍 Booking location check:', {
+              lr: booking.lr_number,
+              from: fromLocation,
+              to: toLocation,
+              agent: agentLocation,
+              agentAssigned: locationName,
+              normalizedFrom: normalizedFromLocation,
+              normalizedTo: normalizedToLocation,
+              normalizedAgent: normalizedAgentLocationField,
+              normalizedAgentAssigned: normalizedAgentLocation,
+              isMatch: isLocationMatch
+            });
+          }
+          
+          return isLocationMatch;
+        });
         
         console.log('📍 Location bookings found:', locationBookings.length);
         console.log('📍 Sample location booking:', locationBookings[0]);
+        
+        // Log unique locations in the system for debugging
+        const uniqueLocations = [...new Set([
+          ...allBookings.map(b => b.from_location?.name).filter(Boolean),
+          ...allBookings.map(b => b.to_location?.name).filter(Boolean),
+          ...allBookings.map(b => b.agent_location).filter(Boolean)
+        ])];
+        console.log('🌍 Unique locations in system:', uniqueLocations);
+        console.log('🎯 Agent assigned location:', locationName);
+        
+        // Additional debugging: Show all bookings with their locations
+        console.log('📋 All bookings with locations:');
+        allBookings.forEach((booking, index) => {
+          if (index < 5) { // Show first 5 bookings
+            console.log(`  ${index + 1}. LR: ${booking.lr_number}, From: ${booking.from_location?.name}, To: ${booking.to_location?.name}, Agent: ${booking.agent_location}`);
+          }
+        });
         
         setBookings(locationBookings);
         setFilteredBookings(locationBookings);
@@ -209,12 +294,31 @@ export default function LocationBookings() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Debug Info - Always show for now */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+        <h3 className="text-sm font-medium text-yellow-800 mb-2">Debug Info</h3>
+        <div className="text-xs text-yellow-700 space-y-1">
+          <div><strong>Agent Location:</strong> {agentLocation || 'Not set'}</div>
+          <div><strong>Total Bookings:</strong> {bookings.length}</div>
+          <div><strong>Filtered Bookings:</strong> {filteredBookings.length}</div>
+          <div><strong>Show Reports:</strong> {showReports ? 'Yes' : 'No'}</div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Location Bookings</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {showReports ? 'Location Reports' : 'Location Bookings'}
+          </h1>
           <p className="text-gray-600 mt-2">
-            All bookings from <span className="font-semibold text-blue-600">{agentLocation}</span> location
+            {showReports ? 'Reports and analytics for ' : 'All bookings from '}
+            <span className="font-semibold text-blue-600">{agentLocation}</span> location
+            {bookings.length > 0 && (
+              <span className="ml-2 text-sm text-gray-500">
+                ({bookings.length} bookings found)
+              </span>
+            )}
           </p>
         </div>
         <Button onClick={exportToCSV} className="bg-green-600 hover:bg-green-700">
@@ -282,6 +386,71 @@ export default function LocationBookings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Additional Reports Cards when showReports is true */}
+        {showReports && (
+          <>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="h-8 w-8 text-indigo-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      ₹{filteredBookings.reduce((sum, b) => sum + (parseFloat(b.charges?.total_amount) || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Package className="h-8 w-8 text-orange-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Delivered</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {filteredBookings.filter(b => b.status === 'delivered').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="h-8 w-8 text-red-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Pending</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {filteredBookings.filter(b => b.status === 'booked').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-8 w-8 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">This Month</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {filteredBookings.filter(b => {
+                        const today = new Date();
+                        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                        return new Date(b.createdAt) >= monthStart;
+                      }).length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Filters */}
@@ -356,103 +525,87 @@ export default function LocationBookings() {
         </CardContent>
       </Card>
 
-      {/* Bookings Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bookings ({filteredBookings.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      LR Number
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      From → To
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sender
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Receiver
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Agent
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentBookings.map((booking) => (
-                    <tr key={booking._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {booking.lr_number || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(booking.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-blue-600" />
-                          <div className="text-sm">
-                            <div className="font-medium text-gray-900">
-                              {booking.from_location?.name} ({booking.from_location?.code})
-                            </div>
-                            <div className="text-gray-500">→</div>
-                            <div className="font-medium text-gray-900">
-                              {booking.to_location?.name} ({booking.to_location?.code})
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">{booking.sender?.name || 'N/A'}</div>
-                          <div className="text-gray-500">{booking.sender?.phone || ''}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">{booking.receiver?.name || 'N/A'}</div>
-                          <div className="text-gray-500">{booking.receiver?.phone || ''}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-600" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {booking.agent_name || 'N/A'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                          getStatusColor(booking.status)
-                        )}>
-                          {booking.status?.replace('_', ' ').toUpperCase() || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ₹{formatAmount(booking.charges?.total_amount || 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+             {/* Bookings Table */}
+       <Card>
+         <CardHeader>
+           <CardTitle>Bookings ({filteredBookings.length})</CardTitle>
+         </CardHeader>
+         <CardContent>
+           <div className="rounded-md border overflow-hidden">
+             <div className="overflow-x-auto">
+               <Table>
+                 <TableHeader>
+                   <TableRow>
+                     <TableHead className="w-32">LR Number</TableHead>
+                     <TableHead className="w-24">Date</TableHead>
+                     <TableHead className="w-48">From → To</TableHead>
+                     <TableHead className="w-40">Sender</TableHead>
+                     <TableHead className="w-40">Receiver</TableHead>
+                     <TableHead className="w-32">Agent</TableHead>
+                     <TableHead className="w-28">Status</TableHead>
+                     <TableHead className="w-24">Amount</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   {currentBookings.map((booking) => (
+                     <TableRow key={booking._id}>
+                       <TableCell className="font-medium">
+                         {booking.lr_number || 'N/A'}
+                       </TableCell>
+                       <TableCell>
+                         {formatDate(booking.createdAt)}
+                       </TableCell>
+                       <TableCell>
+                         <div className="flex items-center gap-2">
+                           <MapPin className="w-4 h-4 text-blue-600" />
+                           <div className="text-sm">
+                             <div className="font-medium text-gray-900">
+                               {booking.from_location?.name} ({booking.from_location?.code})
+                             </div>
+                             <div className="text-gray-500">→</div>
+                             <div className="font-medium text-gray-900">
+                               {booking.to_location?.name} ({booking.to_location?.code})
+                             </div>
+                           </div>
+                         </div>
+                       </TableCell>
+                       <TableCell>
+                         <div className="text-sm">
+                           <div className="font-medium text-gray-900">{booking.sender?.name || 'N/A'}</div>
+                           <div className="text-gray-500">{booking.sender?.phone || ''}</div>
+                         </div>
+                       </TableCell>
+                       <TableCell>
+                         <div className="text-sm">
+                           <div className="font-medium text-gray-900">{booking.receiver?.name || 'N/A'}</div>
+                           <div className="text-gray-500">{booking.receiver?.phone || ''}</div>
+                         </div>
+                       </TableCell>
+                       <TableCell>
+                         <div className="flex items-center gap-2">
+                           <User className="w-4 h-4 text-gray-600" />
+                           <span className="text-sm font-medium text-gray-900">
+                             {booking.agent_name || 'N/A'}
+                           </span>
+                         </div>
+                       </TableCell>
+                       <TableCell>
+                         <span className={cn(
+                           "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                           getStatusColor(booking.status)
+                         )}>
+                           {booking.status?.replace('_', ' ').toUpperCase() || 'N/A'}
+                         </span>
+                       </TableCell>
+                       <TableCell className="font-medium">
+                         ₹{formatAmount(booking.charges?.total_amount || 0)}
+                       </TableCell>
+                     </TableRow>
+                   ))}
+                 </TableBody>
+               </Table>
+             </div>
+           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (

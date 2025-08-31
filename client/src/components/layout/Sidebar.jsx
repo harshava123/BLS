@@ -43,10 +43,10 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
   const navigationTabs = [
     { id: "booking", label: "Booking", icon: Package },
     { id: "location-bookings", label: "Location Bookings", icon: FileText },
+    { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "loading", label: "Loading Sheet", icon: FileText },
     { id: "upcoming", label: "Upcoming", icon: Calendar },
     { id: "delivery", label: "Delivery", icon: Truck },
-    { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "abstract", label: "Abstract Daily Booking", icon: FileText },
     { id: "invoice", label: "Invoice", icon: FileText },
     { id: "search", label: "In Search", icon: Package }
@@ -56,8 +56,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
     { id: "add-agent", label: "Add Agent", icon: User },
     { id: "manage-agents", label: "Manage Agents", icon: User },
     { id: "master-data", label: "Master Data", icon: FileText },
-    { id: "reports", label: "Reports", icon: BarChart3 },
-    { id: "overview", label: "Overview", icon: BarChart3 }
+    { id: "reports", label: "Reports", icon: BarChart3 }
   ];
 
   const tabs = userRole === "admin" ? adminTabs : navigationTabs;
