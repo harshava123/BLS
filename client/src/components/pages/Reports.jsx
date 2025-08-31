@@ -160,8 +160,8 @@ export default function Reports() {
       booking.lr_number || "N/A",
       new Date(booking.createdAt || booking.date).toLocaleDateString(),
       booking.agent_name || "N/A",
-      booking.from_location?.name || "N/A",
-      booking.to_location?.name || "N/A",
+      (booking.from_location?.name || "N/A").toUpperCase(),
+      (booking.to_location?.name || "N/A").toUpperCase(),
       booking.sender?.name || "N/A",
       booking.sender?.phone || "N/A",
       booking.sender?.gst_number || "N/A",
@@ -225,7 +225,7 @@ export default function Reports() {
   }, [agents]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="w-full">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -468,7 +468,7 @@ export default function Reports() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <span className="text-xs">
-                              {booking.from_location?.name || "N/A"} → {booking.to_location?.name || "N/A"}
+                              {(booking.from_location?.name || "N/A").toUpperCase()} → {(booking.to_location?.name || "N/A").toUpperCase()}
                             </span>
                           </div>
                         </td>

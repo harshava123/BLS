@@ -11,7 +11,7 @@ import { API_BASE_URL } from "@/config";
 
 export default function Agent() {
   const [activeTab, setActiveTab] = useState("booking");
-  const [agentLocation, setAgentLocation] = useState("Hyderabad"); // Default location, will be updated from user profile
+  const [agentLocation, setAgentLocation] = useState("Hyderabad (HYD)"); // Default location, will be updated from user profile
   const [user, setUser] = useState(null); // User authentication state
   const [loading, setLoading] = useState(true);
 
@@ -103,17 +103,19 @@ export default function Agent() {
   });
 
   // Master data for dropdowns
-  const [cities, setCities] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [searchQuery, setSearchQuery] = useState(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState(null);
   const [customerSearchQueryReceiver, setCustomerSearchQueryReceiver] = useState(null);
+  
+
 
   // Use ref to track if initial LR has been set
   const initialLRSet = useRef(false);
   
 
-
+  
   // Fetch the highest LR number from database and set counter
   const fetchHighestLRNumber = async () => {
     try {
@@ -190,18 +192,46 @@ export default function Agent() {
     setBookingData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSenderChange = (field, value) => {
+  const handleSenderChange = async (field, value) => {
     setBookingData(prev => ({
       ...prev,
       sender: { ...prev.sender, [field]: value }
     }));
+
+    // Auto-update customer in database if it exists and fields are complete
+    if (bookingData.sender.customer_id && field !== 'gst_number') {
+      const updatedSender = { ...bookingData.sender, [field]: value };
+      if (updatedSender.name && updatedSender.phone && updatedSender.address) {
+        // Use debounced update to avoid too many API calls
+        debouncedUpdateCustomer(bookingData.sender.customer_id, {
+          name: updatedSender.name,
+          phone: updatedSender.phone,
+          address: updatedSender.address,
+          gst_number: updatedSender.gst_number || ""
+        });
+      }
+    }
   };
 
-  const handleReceiverChange = (field, value) => {
+  const handleReceiverChange = async (field, value) => {
     setBookingData(prev => ({
       ...prev,
       receiver: { ...prev.receiver, [field]: value }
     }));
+
+    // Auto-update customer in database if it exists and fields are complete
+    if (bookingData.receiver.customer_id && field !== 'gst_number') {
+      const updatedReceiver = { ...bookingData.receiver, [field]: value };
+      if (updatedReceiver.name && updatedReceiver.phone && updatedReceiver.address) {
+        // Use debounced update to avoid too many API calls
+        debouncedUpdateCustomer(bookingData.receiver.customer_id, {
+          name: updatedReceiver.name,
+          phone: updatedReceiver.phone,
+          address: updatedReceiver.address,
+          gst_number: updatedReceiver.gst_number || ""
+        });
+      }
+    }
   };
 
   const handleItemChange = (index, field, value) => {
@@ -305,8 +335,9 @@ export default function Agent() {
       let senderCustomerId = bookingData.sender.customer_id;
       let receiverCustomerId = bookingData.receiver.customer_id;
 
-      // Create sender customer if new
-      if (!senderCustomerId) {
+      // Create sender customer if new (excluding GST)
+      let senderCustomerCreated = false;
+      if (!senderCustomerId && bookingData.sender.name && bookingData.sender.phone && bookingData.sender.address) {
         try {
           const senderResponse = await fetch(`${API_BASE_URL}/api/customers`, {
             method: 'POST',
@@ -315,21 +346,25 @@ export default function Agent() {
               name: bookingData.sender.name,
               phone: bookingData.sender.phone,
               address: bookingData.sender.address,
-              gst_number: bookingData.sender.gst_number
+              gst_number: "" // GST is optional, not required
             })
           });
           
           if (senderResponse.ok) {
             const senderCustomer = await senderResponse.json();
             senderCustomerId = senderCustomer._id;
+            senderCustomerCreated = true;
+            // Add new customer to local state for immediate dropdown update
+            setCustomers(prev => [...prev, senderCustomer]);
           }
         } catch (error) {
           console.error('Error creating sender customer:', error);
         }
       }
 
-      // Create receiver customer if new
-      if (!receiverCustomerId) {
+      // Create receiver customer if new (excluding GST)
+      let receiverCustomerCreated = false;
+      if (!receiverCustomerId && bookingData.receiver.name && bookingData.receiver.phone && bookingData.receiver.address) {
         try {
           const receiverResponse = await fetch(`${API_BASE_URL}/api/customers`, {
             method: 'POST',
@@ -338,13 +373,16 @@ export default function Agent() {
               name: bookingData.receiver.name,
               phone: bookingData.receiver.phone,
               address: bookingData.receiver.address,
-              gst_number: bookingData.receiver.gst_number
+              gst_number: "" // GST is optional, not required
             })
           });
           
           if (receiverResponse.ok) {
             const receiverCustomer = await receiverResponse.json();
             receiverCustomerId = receiverCustomer._id;
+            receiverCustomerCreated = true;
+            // Add new customer to local state for immediate dropdown update
+            setCustomers(prev => [...prev, receiverCustomer]);
           }
         } catch (error) {
           console.error('Error creating receiver customer:', error);
@@ -361,14 +399,14 @@ export default function Agent() {
       console.log('✅ User authenticated successfully:', user.name);
 
       // Prepare booking data with agent info
-      const bookingDataWithAgent = {
-        ...bookingData,
+    const bookingDataWithAgent = {
+      ...bookingData,
         sender: { ...bookingData.sender, customer_id: senderCustomerId },
         receiver: { ...bookingData.receiver, customer_id: receiverCustomerId },
         agent_id: user.id,
         agent_location: agentLocation,
         status: "booked"
-      };
+    };
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/bookings`, {
@@ -382,7 +420,24 @@ export default function Agent() {
       if (response.ok) {
         const result = await response.json();
         console.log('Booking saved:', result);
-        alert('Booking confirmed and saved!');
+        
+        // Show success message with customer creation info
+        let successMessage = 'Booking confirmed and saved!';
+        if (senderCustomerCreated || receiverCustomerCreated) {
+          successMessage += '\n\nNew customers created:';
+          if (senderCustomerCreated) successMessage += `\n• Sender: ${bookingData.sender.name}`;
+          if (receiverCustomerCreated) successMessage += `\n• Receiver: ${bookingData.receiver.name}`;
+          successMessage += '\n\nThese customers are now available in the master data for future bookings.';
+        }
+        
+        alert(successMessage);
+        
+        // Clear temporary customer data from localStorage
+        localStorage.removeItem('temp_sender_data');
+        localStorage.removeItem('temp_receiver_data');
+        
+        // Refresh customers list to ensure all new customers are loaded
+        fetchMasterData();
           
           // Reset form
           setBookingData({
@@ -440,6 +495,45 @@ export default function Agent() {
     }
   };
 
+  // Debounced update function to avoid too many API calls
+  const debouncedUpdateCustomer = useCallback((customerId, customerData) => {
+    // Clear any existing timeout
+    if (window.customerUpdateTimeout) {
+      clearTimeout(window.customerUpdateTimeout);
+    }
+    
+    // Set new timeout
+    window.customerUpdateTimeout = setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/customers/${customerId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerData)
+        });
+        
+        if (response.ok) {
+          const updatedCustomer = await response.json();
+          // Update local customers state
+          setCustomers(prev => prev.map(cust => 
+            cust._id === updatedCustomer._id ? updatedCustomer : cust
+          ));
+          console.log('Customer updated in database:', updatedCustomer);
+        }
+      } catch (error) {
+        console.error('Error updating customer:', error);
+      }
+    }, 1000); // 1 second delay
+  }, []);
+
+  // Check if customer exists in the list
+  const customerExists = (name, phone) => {
+    if (!name) return false;
+    return customers.some(customer => 
+      customer.name.toLowerCase() === name.toLowerCase() || 
+      (phone && customer.phone === phone)
+    );
+  };
+
   // Fetch master data for dropdowns
   const fetchMasterData = async () => {
     try {
@@ -451,16 +545,16 @@ export default function Agent() {
       if (response.ok) {
         const data = await response.json();
         console.log('Master data received:', data); // Debug log
-        console.log('Cities count:', data.cities?.length); // Debug log
-        console.log('Sample cities:', data.cities?.slice(0, 3)); // Debug log
-        console.log('Full cities array:', data.cities); // Debug log
+        console.log('Locations count:', data.locations?.length); // Debug log
+        console.log('Sample locations:', data.locations?.slice(0, 3)); // Debug log
+        console.log('Full locations array:', data.locations); // Debug log
         
-        if (data.cities && Array.isArray(data.cities)) {
-          setCities(data.cities);
-          console.log('Cities state set successfully');
+        if (data.locations && Array.isArray(data.locations)) {
+          setLocations(data.locations);
+          console.log('Locations state set successfully');
         } else {
-          console.error('Cities data is not an array:', data.cities);
-          setCities([]);
+          console.error('Locations data is not an array:', data.locations);
+          setLocations([]);
         }
         
         if (data.customers && Array.isArray(data.customers)) {
@@ -504,7 +598,7 @@ export default function Agent() {
         const token = localStorage.getItem('auth_token');
         if (!token) {
           console.error('No auth token found');
-          setAgentLocation("Hyderabad");
+          setAgentLocation("Hyderabad (HYD)");
           setBookingData(prev => ({
             ...prev,
             from_location: {
@@ -529,11 +623,15 @@ export default function Agent() {
             setAgentLocation(data.user.location);
             console.log('Agent location set to:', data.user.location); // Debug log
             
+            // Extract location name from format "Name (CODE)" for API calls
+            const locationName = data.user.location.split(' (')[0];
+            console.log('Extracted location name:', locationName);
+            
             // Find the location details from the locations collection
-            const locationResponse = await fetch(`${API_BASE_URL}/api/locations?search=${encodeURIComponent(data.user.location)}`);
+            const locationResponse = await fetch(`${API_BASE_URL}/api/locations?search=${encodeURIComponent(locationName)}`);
             if (locationResponse.ok) {
               const locations = await locationResponse.json();
-              const agentLocationData = locations.find(loc => loc.name === data.user.location);
+              const agentLocationData = locations.find(loc => loc.name === locationName);
               
               if (agentLocationData) {
                 // Set from_location with proper location data
@@ -563,7 +661,7 @@ export default function Agent() {
                       code: fallbackLocation.code
                     }
                   }));
-                  setAgentLocation("Hyderabad"); // Update UI to show fallback
+                  setAgentLocation("Hyderabad (HYD)"); // Update UI to show fallback
                 } else {
                   console.error('❌ No fallback location found, cannot proceed');
                   alert(`Location "${data.user.location}" not found in system. Please contact admin to add this location.`);
@@ -587,7 +685,7 @@ export default function Agent() {
                         code: hyderabadLocation.code
                       }
                     }));
-                    setAgentLocation("Hyderabad");
+                    setAgentLocation("Hyderabad (HYD)");
                     console.log('🔄 Using Hyderabad as fallback due to API failure');
                   }
                 }
@@ -600,7 +698,7 @@ export default function Agent() {
           } else {
             console.log('No location found in user data:', data.user); // Debug log
             // Set a default location if none is found
-            setAgentLocation("Hyderabad");
+            setAgentLocation("Hyderabad (HYD)");
             setBookingData(prev => ({
               ...prev,
               from_location: {
@@ -613,7 +711,7 @@ export default function Agent() {
         } else {
           console.error('Failed to fetch user profile');
           // Set a default location as fallback
-          setAgentLocation("Hyderabad");
+          setAgentLocation("Hyderabad (HYD)");
           setBookingData(prev => ({
             ...prev,
             from_location: {
@@ -626,7 +724,7 @@ export default function Agent() {
       } catch (error) {
         console.error('Error fetching agent location:', error);
         // Set a default location as fallback
-        setAgentLocation("Hyderabad");
+        setAgentLocation("Hyderabad (HYD)");
         setBookingData(prev => ({
           ...prev,
           from_location: {
@@ -644,10 +742,229 @@ export default function Agent() {
     fetchMasterData();
   }, []);
 
-  // Debug: Log cities state changes
+  // Debug: Log locations state changes
   useEffect(() => {
-    console.log('Cities state updated:', cities);
-  }, [cities]);
+    console.log('Locations state updated:', locations);
+  }, [locations]);
+
+  // Auto-save sender details to localStorage whenever they change (except GST)
+  useEffect(() => {
+    if (bookingData.sender.name || bookingData.sender.phone || bookingData.sender.address) {
+      const senderData = {
+        name: bookingData.sender.name || "",
+        phone: bookingData.sender.phone || "",
+        address: bookingData.sender.address || ""
+      };
+      localStorage.setItem('temp_sender_data', JSON.stringify(senderData));
+    }
+  }, [bookingData.sender.name, bookingData.sender.phone, bookingData.sender.address]);
+
+  // Auto-create new customer when sender details are complete (except GST)
+  useEffect(() => {
+    const createNewCustomer = async () => {
+      if (bookingData.sender.name && bookingData.sender.phone && bookingData.sender.address && !bookingData.sender.customer_id) {
+        // Check if customer already exists
+        const existingCustomer = customers.find(cust => 
+          cust.name.toLowerCase() === bookingData.sender.name.toLowerCase() ||
+          cust.phone === bookingData.sender.phone
+        );
+        
+        if (!existingCustomer) {
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/customers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: bookingData.sender.name,
+                phone: bookingData.sender.phone,
+                address: bookingData.sender.address,
+                gst_number: "" // GST is optional
+              })
+            });
+            
+            if (response.ok) {
+              const newCustomer = await response.json();
+              // Add new customer to local state for immediate dropdown update
+              setCustomers(prev => [...prev, newCustomer]);
+              // Update sender with customer_id
+              setBookingData(prev => ({
+                ...prev,
+                sender: { ...prev.sender, customer_id: newCustomer._id }
+              }));
+              console.log('New sender customer created:', newCustomer);
+              // Refresh master data to ensure new customer is loaded
+              fetchMasterData();
+            }
+          } catch (error) {
+            console.error('Error auto-creating sender customer:', error);
+          }
+        }
+      }
+    };
+
+    createNewCustomer();
+  }, [bookingData.sender.name, bookingData.sender.phone, bookingData.sender.address]);
+
+  // Auto-save receiver details to localStorage whenever they change (except GST)
+  useEffect(() => {
+    if (bookingData.receiver.name || bookingData.receiver.phone || bookingData.receiver.address) {
+      const receiverData = {
+        name: bookingData.receiver.name || "",
+        phone: bookingData.receiver.phone || "",
+        address: bookingData.receiver.address || ""
+      };
+      localStorage.setItem('temp_receiver_data', JSON.stringify(receiverData));
+    }
+  }, [bookingData.receiver.name, bookingData.receiver.phone, bookingData.receiver.address]);
+
+  // Auto-create new customer when receiver details are complete (except GST)
+  useEffect(() => {
+    const createNewCustomer = async () => {
+      if (bookingData.receiver.name && bookingData.receiver.phone && bookingData.receiver.address && !bookingData.receiver.customer_id) {
+        // Check if customer already exists
+        const existingCustomer = customers.find(cust => 
+          cust.name.toLowerCase() === bookingData.receiver.name.toLowerCase() ||
+          cust.phone === bookingData.receiver.phone
+        );
+        
+        if (!existingCustomer) {
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/customers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: bookingData.receiver.name,
+                phone: bookingData.receiver.phone,
+                address: bookingData.receiver.address,
+                gst_number: "" // GST is optional
+              })
+            });
+            
+            if (response.ok) {
+              const newCustomer = await response.json();
+              // Add new customer to local state for immediate dropdown update
+              setCustomers(prev => [...prev, newCustomer]);
+              // Update receiver with customer_id
+              setBookingData(prev => ({
+                ...prev,
+                receiver: { ...prev.receiver, customer_id: newCustomer._id }
+              }));
+              console.log('New receiver customer created:', newCustomer);
+              // Refresh master data to ensure new customer is loaded
+              fetchMasterData();
+            }
+          } catch (error) {
+            console.error('Error auto-creating receiver customer:', error);
+          }
+        }
+      }
+    };
+
+    createNewCustomer();
+  }, [bookingData.receiver.name, bookingData.receiver.phone, bookingData.receiver.address]);
+
+  // Smart auto-population: suggest sender name in receiver field only for new customers
+  useEffect(() => {
+    if (bookingData.sender.name && !bookingData.receiver.name) {
+      // Check if sender is a newly created customer (no customer_id means it's new)
+      const isNewSender = !bookingData.sender.customer_id;
+      
+      if (isNewSender) {
+        // Only suggest sender name if it's a new customer
+        console.log('Suggesting new sender name in receiver field:', bookingData.sender.name);
+        // Don't auto-set the value, just prepare it for suggestion
+      }
+    }
+  }, [bookingData.sender.name, bookingData.receiver.name, bookingData.sender.customer_id]);
+
+  // Real-time sync: Update customer data in both sender and receiver when either changes
+  useEffect(() => {
+    // When sender customer data changes, update the customers list for receiver dropdown
+    if (bookingData.sender.customer_id) {
+      const senderCustomer = customers.find(cust => cust._id === bookingData.sender.customer_id);
+      if (senderCustomer) {
+        // Update the customer in the list with current form data
+        const updatedCustomer = {
+          ...senderCustomer,
+          name: bookingData.sender.name,
+          phone: bookingData.sender.phone,
+          address: bookingData.sender.address
+        };
+        
+        setCustomers(prev => prev.map(cust => 
+          cust._id === updatedCustomer._id ? updatedCustomer : cust
+        ));
+      }
+    }
+  }, [bookingData.sender.name, bookingData.sender.phone, bookingData.sender.address, bookingData.sender.customer_id]);
+
+  useEffect(() => {
+    // When receiver customer data changes, update the customers list for sender dropdown
+    if (bookingData.receiver.customer_id) {
+      const receiverCustomer = customers.find(cust => cust._id === bookingData.receiver.customer_id);
+      if (receiverCustomer) {
+        // Update the customer in the list with current form data
+        const updatedCustomer = {
+          ...receiverCustomer,
+          name: bookingData.receiver.name,
+          phone: bookingData.receiver.phone,
+          address: bookingData.receiver.address
+        };
+        
+        setCustomers(prev => prev.map(cust => 
+          cust._id === updatedCustomer._id ? updatedCustomer : cust
+        ));
+      }
+    }
+  }, [bookingData.receiver.name, bookingData.receiver.phone, bookingData.receiver.address, bookingData.receiver.customer_id]);
+
+
+
+  // Restore customer data from localStorage on component mount
+  useEffect(() => {
+    const savedSenderData = localStorage.getItem('temp_sender_data');
+    const savedReceiverData = localStorage.getItem('temp_receiver_data');
+    
+    if (savedSenderData) {
+      try {
+        const senderData = JSON.parse(savedSenderData);
+        if (senderData.name || senderData.phone || senderData.address) {
+          setBookingData(prev => ({
+            ...prev,
+            sender: { 
+              ...prev.sender, 
+              name: senderData.name || prev.sender.name,
+              phone: senderData.phone || prev.sender.phone,
+              address: senderData.address || prev.sender.address
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing sender data:', error);
+      }
+    }
+    
+    if (savedReceiverData) {
+      try {
+        const receiverData = JSON.parse(savedReceiverData);
+        if (receiverData.name || receiverData.phone || receiverData.address) {
+          setBookingData(prev => ({
+            ...prev,
+            receiver: { 
+              ...prev.receiver, 
+              name: receiverData.name || prev.receiver.name,
+              phone: receiverData.phone || prev.receiver.phone,
+              address: receiverData.address || prev.receiver.address
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing receiver data:', error);
+      }
+    }
+  }, []);
+
+
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -756,23 +1073,24 @@ export default function Agent() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Unified Sidebar */}
+    <div className="h-screen flex bg-gray-50">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole="agent" />
+      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-6">
+      {/* Scrollable Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
         {/* Breadcrumbs */}
         <div className="mb-4">
           <p className="text-xs text-gray-500">Home {'>>'} {activeTab} {'>>'} List</p>
         </div>
 
-        
-
-        {/* Section Header - Removed blue bar, keeping only breadcrumbs */}
-        <div className="mb-6">
-          {/* Breadcrumbs only */}
-              </div>
+          {/* Section Header - Removed blue bar, keeping only breadcrumbs */}
+          <div className="mb-6">
+            {/* Breadcrumbs only */}
+          </div>
 
                         {/* New Booking Form */}
         {activeTab === "booking" && (
@@ -805,25 +1123,25 @@ export default function Agent() {
                         <SelectItem value="on_account">On Account</SelectItem>
                       </SelectContent>
                     </Select>
-        </div>
+              </div>
 
                   <div>
                     <Label className="text-sm font-medium text-gray-700">From Location *</Label>
                     <Input
-                      value={agentLocation || "Loading location..."}
+                      value={(agentLocation || "Loading location...").toUpperCase()}
                       className="h-10 bg-gray-100"
                       readOnly
                     />
-              </div>
+          </div>
 
                                                           <div id="to-location-field" className="relative">
                       <Label className="text-sm font-medium text-gray-700">To Location *</Label>
                       <div className="relative">
                         <Input
-                          placeholder="Search location..."
+                          placeholder="Search or enter location name..."
                           value={searchQuery || bookingData.to_location.name || ""}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          onFocus={() => setSearchQuery("")} // Show all cities when focused
+                          onFocus={() => setSearchQuery("")} // Show all locations when focused
                           onBlur={() => {
                             // Hide dropdown after a short delay
                             setTimeout(() => setSearchQuery(null), 200);
@@ -835,57 +1153,57 @@ export default function Agent() {
                       </div>
                       {searchQuery !== null && (
                         <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                          {cities.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-gray-500">No cities available</div>
-                          ) : cities
-                            .filter(city => 
-                              city.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              city.code.toLowerCase().includes(searchQuery.toLowerCase())
-                            )
-                            .map(city => (
-                              <div
-                                key={city._id}
-                                className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
-                                onMouseDown={() => {
-                                  console.log('City selected:', city); // Debug log
-                                  setBookingData(prev => ({
-                                    ...prev,
-                                    to_location: {
-                                      location_id: city._id,
-                                      name: city.name,
-                                      code: city.code
-                                    }
-                                  }));
-                                  setSearchQuery(null); // Hide dropdown after selection
-                                  console.log('Updated booking data:', {
-                                    ...bookingData,
-                                    to_location: {
-                                      location_id: city._id,
-                                      name: city.name,
-                                      code: city.code
-                                    }
-                                  }); // Debug log
-                                }}
-                                onTouchStart={() => {
-                                  console.log('City touched:', city); // Debug log
-                                  setBookingData(prev => ({
-                                    ...prev,
-                                    to_location: {
-                                      location_id: city._id,
-                                      name: city.name,
-                                      code: city.code
-                                    }
-                                  }));
-                                  setSearchQuery(null); // Hide dropdown after selection
-                                }}
-                              >
-                                {city.name} ({city.code})
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  
+                                                  {locations.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-500">No locations available</div>
+                        ) : locations
+                          .filter(location => 
+                            location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            location.code.toLowerCase().includes(searchQuery.toLowerCase())
+                          )
+                          .map(location => (
+                            <div
+                              key={location._id}
+                              className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
+                              onMouseDown={() => {
+                                console.log('Location selected:', location); // Debug log
+                                setBookingData(prev => ({
+                                  ...prev,
+                                  to_location: {
+                                    location_id: location._id,
+                                    name: location.name,
+                                    code: location.code
+                                  }
+                                }));
+                                setSearchQuery(null); // Hide dropdown after selection
+                                console.log('Updated booking data:', {
+                                  ...bookingData,
+                                  to_location: {
+                                    location_id: location._id,
+                                    name: location.name,
+                                    code: location.code
+                                  }
+                                }); // Debug log
+                              }}
+                              onTouchStart={() => {
+                                console.log('Location touched:', location); // Debug log
+                                setBookingData(prev => ({
+                                  ...prev,
+                                  to_location: {
+                                    location_id: location._id,
+                                    name: location.name,
+                                    code: location.code
+                                  }
+                                }));
+                                setSearchQuery(null); // Hide dropdown after selection
+                              }}
+                            >
+                              {location.name.toUpperCase()} ({location.code.toUpperCase()})
+                            </div>
+                          ))}
+            </div>
+          )}
+        </div>
+
                   <div>
                     <Label className="text-sm font-medium text-gray-700">Date</Label>
                     <Input
@@ -910,59 +1228,110 @@ export default function Agent() {
                         <div className="relative">
                     <Input
                             placeholder="Search or enter customer name..."
-                            value={customerSearchQuery || bookingData.sender.name || ""}
-                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                            onFocus={() => setCustomerSearchQuery("")}
+                            value={bookingData.sender.name || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleSenderChange('name', value);
+                              setCustomerSearchQuery(value);
+                              console.log('Sender field changed:', value, 'customerSearchQuery set to:', value);
+                            }}
+                            onFocus={() => {
+                              // Show all customers when field is focused
+                              setCustomerSearchQuery("");
+                            }}
                             onBlur={() => {
                               setTimeout(() => setCustomerSearchQuery(null), 200);
                             }}
                             className="h-10 pr-10"
                           />
                           <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                          
+                          {/* Customer Dropdown */}
+                          {customerSearchQuery !== null && (
+                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                              {(() => {
+                                // If there's a search query, filter customers; otherwise show all
+                                let filteredCustomers = customerSearchQuery ? 
+                                  customers.filter(cust => 
+                                    cust.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                                    cust.phone.includes(customerSearchQuery)
+                                  ) : 
+                                  customers;
+                                
+                                // Sort customers: newly created ones first, then alphabetically
+                                filteredCustomers.sort((a, b) => {
+                                  // Newly created customers first
+                                  if (a._id === bookingData.sender.customer_id) return -1;
+                                  if (b._id === bookingData.sender.customer_id) return 1;
+                                  // Then sort alphabetically by name
+                                  return a.name.localeCompare(b.name);
+                                });
+                                
+                                if (filteredCustomers.length > 0) {
+                                  return filteredCustomers.map(customer => (
+                                    <div
+                                      key={customer._id}
+                                      className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
+                                      onMouseDown={() => {
+                                        setBookingData(prev => ({
+                                          ...prev,
+                                          sender: {
+                                            customer_id: customer._id,
+                                            name: customer.name,
+                                            phone: customer.phone,
+                                            gst_number: customer.gst_number || "",
+                                            address: customer.address
+                                          }
+                                        }));
+                                        setCustomerSearchQuery(null);
+                                      }}
+                                      onTouchStart={() => {
+                                        setBookingData(prev => ({
+                                          ...prev,
+                                          sender: {
+                                            customer_id: customer._id,
+                                            name: customer.name,
+                                            phone: customer.phone,
+                                            gst_number: customer.gst_number || "",
+                                            address: customer.address
+                                          }
+                                        }));
+                                        setCustomerSearchQuery(null);
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>{customer.name} - {customer.phone}</span>
+                                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                                          Existing
+                                        </span>
                   </div>
-                        {customerSearchQuery !== null && (
-                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto" style={{ maxWidth: 'calc(100% - 2rem)' }}>
-                            {customers
-                              .filter(cust => 
-                                cust.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                                cust.phone.includes(customerSearchQuery)
-                              )
-                              .map(customer => (
-                                <div
-                                  key={customer._id}
-                                  className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
-                                  onMouseDown={() => {
-                                    setBookingData(prev => ({
-                                      ...prev,
-                                      sender: {
-                                        customer_id: customer._id,
-                                        name: customer.name,
-                                        phone: customer.phone,
-                                        gst_number: customer.gst_number || "",
-                                        address: customer.address
-                                      }
-                                    }));
-                                    setCustomerSearchQuery(null);
-                                  }}
-                                  onTouchStart={() => {
-                                    setBookingData(prev => ({
-                                      ...prev,
-                                      sender: {
-                                        customer_id: customer._id,
-                                        name: customer.name,
-                                        phone: customer.phone,
-                                        gst_number: customer.gst_number || "",
-                                        address: customer.address
-                                      }
-                                    }));
-                                    setCustomerSearchQuery(null);
-                                  }}
-                                >
-                                  {customer.name} - {customer.phone}
-                                </div>
-                              ))}
-                          </div>
-                        )}
+                                    </div>
+                                  ));
+                                } else {
+                                  return (
+                                    <div className="px-3 py-3 text-sm text-gray-500">
+                                      <div className="flex items-center justify-between">
+                                        <span>No matching customers found</span>
+                                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">New customer will be created</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              })()}
+                            </div>
+                          )}
+
+                          {bookingData.sender.name && !customerExists(bookingData.sender.name, bookingData.sender.phone) && (
+                            <div className="absolute -bottom-6 left-0 text-xs text-blue-600">
+                              ✨ New customer will be created automatically
+                            </div>
+                          )}
+
+
+                  </div>
+                  
+
+
                       </div>
                       
                   <div>
@@ -983,18 +1352,18 @@ export default function Agent() {
                           value={bookingData.sender.gst_number}
                           onChange={(e) => handleSenderChange('gst_number', e.target.value)}
                           className="h-10"
-                  />
-                </div>
+                    />
+                  </div>
                       
-                <div>
+                  <div>
                         <Label className="text-sm font-medium text-gray-700">Address</Label>
                         <Textarea
                           placeholder="Full address"
                           value={bookingData.sender.address}
                           onChange={(e) => handleSenderChange('address', e.target.value)}
                           className="min-h-[80px]"
-                          required
-                  />
+                      required
+                    />
                   </div>
                 </div>
               </div>
@@ -1018,11 +1387,25 @@ export default function Agent() {
                   <div id="receiver-customer-field" className="relative">
                         <Label className="text-sm font-medium text-gray-700">Customer Name *</Label>
                         <div className="relative">
-                          <Input
+                    <Input
                             placeholder="Search or enter customer name..."
-                            value={customerSearchQueryReceiver || bookingData.receiver.name || ""}
-                            onChange={(e) => setCustomerSearchQueryReceiver(e.target.value)}
-                            onFocus={() => setCustomerSearchQueryReceiver("")}
+                            value={bookingData.receiver.name || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleReceiverChange('name', value);
+                              setCustomerSearchQueryReceiver(value);
+                              console.log('Receiver field changed:', value, 'customerSearchQueryReceiver set to:', value);
+                            }}
+                            onFocus={() => {
+                              // Show all customers when field is focused
+                              setCustomerSearchQueryReceiver("");
+                              
+                              // If sender has a new customer name, suggest it
+                              if (bookingData.sender.name && !bookingData.sender.customer_id && !bookingData.receiver.name) {
+                                console.log('Suggesting sender name in receiver dropdown:', bookingData.sender.name);
+                                // The suggestion will be handled in the dropdown display
+                              }
+                            }}
                             onBlur={() => {
                               setTimeout(() => setCustomerSearchQueryReceiver(null), 200);
                             }}
@@ -1030,52 +1413,143 @@ export default function Agent() {
                             required
                           />
                           <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                        </div>
-                        {customerSearchQueryReceiver !== null && (
-                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto" style={{ maxWidth: 'calc(100% - 2rem)' }}>
-                            {customers
-                              .filter(cust => 
-                                cust.name.toLowerCase().includes(customerSearchQueryReceiver.toLowerCase()) ||
-                                cust.phone.includes(customerSearchQueryReceiver)
-                              )
-                              .map(customer => (
-                                <div
-                                  key={customer._id}
-                                  className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
-                                  onMouseDown={() => {
-                                    setBookingData(prev => ({
-                                      ...prev,
-                                      receiver: {
-                                        customer_id: customer._id,
-                                        name: customer.name,
-                                        phone: customer.phone,
-                                        gst_number: customer.gst_number || "",
-                                        address: customer.address
-                                      }
-                                    }));
-                                    setCustomerSearchQueryReceiver(null);
-                                  }}
-                                  onTouchStart={() => {
-                                    setBookingData(prev => ({
-                                      ...prev,
-                                      receiver: {
-                                        customer_id: customer._id,
-                                        name: customer.name,
-                                        phone: customer.phone,
-                                        gst_number: customer.gst_number || "",
-                                        address: customer.address
-                                      }
-                                    }));
-                                    setCustomerSearchQueryReceiver(null);
-                                  }}
-                                >
-                                  {customer.name} - {customer.phone}
-                                </div>
-                              ))}
-                          </div>
-                        )}
+                          
+                          {/* Customer Dropdown */}
+                          {customerSearchQueryReceiver !== null && (
+                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                                                             {(() => {
+                                 // If there's a search query, filter customers; otherwise show all
+                                 let filteredCustomers = customerSearchQueryReceiver ? 
+                                   customers.filter(cust => 
+                                     cust.name.toLowerCase().includes(customerSearchQueryReceiver.toLowerCase()) ||
+                                     cust.phone.includes(customerSearchQueryReceiver)
+                                   ) : 
+                                   customers;
+                                 
+                                 // Sort customers: newly created ones first, then alphabetically
+                                 filteredCustomers.sort((a, b) => {
+                                   // Newly created customers first
+                                   if (a._id === bookingData.receiver.customer_id) return -1;
+                                   if (b._id === bookingData.receiver.customer_id) return 1;
+                                   // Then sort alphabetically by name
+                                   return a.name.localeCompare(b.name);
+                                 });
+                                 
+                                 // Check if we should show sender name suggestion
+                                 const shouldShowSenderSuggestion = !customerSearchQueryReceiver && 
+                                   bookingData.sender.name && 
+                                   !bookingData.sender.customer_id && 
+                                   !bookingData.receiver.name;
+                                 
+                                 if (filteredCustomers.length > 0 || shouldShowSenderSuggestion) {
+                                   return (
+                                     <>
+                                       {/* Show sender name suggestion if applicable */}
+                                       {shouldShowSenderSuggestion && (
+                                         <div
+                                           className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 select-none touch-manipulation bg-blue-50"
+                                           onMouseDown={() => {
+                                             setBookingData(prev => ({
+                                               ...prev,
+                                               receiver: {
+                                                 customer_id: "",
+                                                 name: prev.sender.name,
+                                                 phone: prev.sender.phone,
+                                                 gst_number: "",
+                                                 address: prev.sender.address
+                                               }
+                                             }));
+                                             setCustomerSearchQueryReceiver(null);
+                                           }}
+                                           onTouchStart={() => {
+                                             setBookingData(prev => ({
+                                               ...prev,
+                                               receiver: {
+                                                 customer_id: "",
+                                                 name: prev.sender.name,
+                                                 phone: prev.sender.phone,
+                                                 gst_number: "",
+                                                 address: prev.sender.address
+                                               }
+                                             }));
+                                             setCustomerSearchQueryReceiver(null);
+                                           }}
+                                         >
+                                           <div className="flex items-center justify-between">
+                                             <span>{bookingData.sender.name} - {bookingData.sender.phone}</span>
+                                             <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">Copy from Sender</span>
                   </div>
-                      
+                </div>
+                                       )}
+                                       
+                                       {/* Show existing customers */}
+                                       {filteredCustomers.map(customer => (
+                                    <div
+                                      key={customer._id}
+                                      className="px-3 py-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 select-none touch-manipulation"
+                                      onMouseDown={() => {
+                                        setBookingData(prev => ({
+                                          ...prev,
+                                          receiver: {
+                                            customer_id: customer._id,
+                                            name: customer.name,
+                                            phone: customer.phone,
+                                            gst_number: customer.gst_number || "",
+                                            address: customer.address
+                                          }
+                                        }));
+                                        setCustomerSearchQueryReceiver(null);
+                                      }}
+                                      onTouchStart={() => {
+                                        setBookingData(prev => ({
+                                          ...prev,
+                                          receiver: {
+                                            customer_id: customer._id,
+                                            name: customer.name,
+                                            phone: customer.phone,
+                                            gst_number: customer.gst_number || "",
+                                            address: customer.address
+                                          }
+                                        }));
+                                        setCustomerSearchQueryReceiver(null);
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>{customer.name} - {customer.phone}</span>
+                                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                                          Existing
+                                        </span>
+              </div>
+                                    </div>
+                                  ))}
+                                     </>);
+                                } else {
+                                  return (
+                                    <div className="px-3 py-3 text-sm text-gray-500">
+                                      <div className="flex items-center justify-between">
+                                        <span>No matching customers found</span>
+                                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">New customer will be created</span>
+              </div>
+                                    </div>
+                                  );
+                                }
+                              })()}
+                            </div>
+                          )}
+
+                          {bookingData.receiver.name && !customerExists(bookingData.receiver.name, bookingData.receiver.phone) && (
+                            <div className="absolute -bottom-6 left-0 text-xs text-blue-600">
+                              ✨ New customer will be created automatically
+                            </div>
+                          )}
+
+
+                  </div>
+                  
+
+
+              </div>
+
                   <div>
                         <Label className="text-sm font-medium text-gray-700">Mobile No</Label>
                     <Input
@@ -1094,10 +1568,10 @@ export default function Agent() {
                           value={bookingData.receiver.gst_number}
                           onChange={(e) => handleReceiverChange('gst_number', e.target.value)}
                           className="h-10"
-                        />
-                      </div>
+                />
+                  </div>
                       
-                      <div>
+                  <div>
                         <Label className="text-sm font-medium text-gray-700">Address</Label>
                         <Textarea
                           placeholder="Full address"
@@ -1322,7 +1796,7 @@ export default function Agent() {
               <h3 className="text-lg font-medium text-gray-800">Loading Sheet</h3>
               {agentLocation && (
                 <div className="text-sm text-gray-600">
-                  📍 Location: <span className="font-medium text-blue-600">{agentLocation}</span>
+                                                📍 Location: <span className="font-medium text-blue-600">{agentLocation.toUpperCase()}</span>
                 </div>
               )}
             </div>
@@ -1609,7 +2083,7 @@ export default function Agent() {
         )}
 
         {/* Abstract Daily Booking Tab */}
-        {activeTab === "abstractDailyBooking" && (
+        {activeTab === "abstract" && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center mb-6">
               <div className="bg-green-200 px-4 py-2 rounded mr-4">
@@ -1720,7 +2194,7 @@ export default function Agent() {
         )}
 
         {/* In Search Tab */}
-        {activeTab === "inSearch" && (
+        {activeTab === "search" && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center mb-6">
               <div className="bg-green-200 px-4 py-2 rounded mr-4">
@@ -1838,6 +2312,7 @@ export default function Agent() {
             <p className="text-sm text-gray-600">Upcoming consignments will be shown here.</p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

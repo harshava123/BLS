@@ -34,6 +34,51 @@ app.use('/api/locations', require('./routes/locations'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/master-data', require('./routes/masterData'));
 
+// Cleanup endpoint for database maintenance
+app.post('/api/cleanup/cities', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const citiesCollection = mongoose.connection.collection('cities');
+    
+    console.log('Cleaning up cities collection...');
+    
+    // Remove address and contact fields from all cities
+    const result = await citiesCollection.updateMany(
+      {},
+      {
+        $unset: {
+          address: "",
+          contact: ""
+        }
+      }
+    );
+    
+    console.log(`✅ Successfully cleaned up ${result.modifiedCount} cities`);
+    
+    // Show updated cities
+    const cities = await citiesCollection.find({}).toArray();
+    const cleanedCities = cities.map(city => ({
+      name: city.name,
+      code: city.code,
+      fields: Object.keys(city)
+    }));
+    
+    res.json({
+      success: true,
+      message: `Successfully cleaned up ${result.modifiedCount} cities`,
+      cities: cleanedCities
+    });
+    
+  } catch (error) {
+    console.error('❌ Error cleaning up cities:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cleaning up cities',
+      error: error.message
+    });
+  }
+});
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.json({ 

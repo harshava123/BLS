@@ -9,8 +9,7 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight,
-  Info
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -63,8 +62,8 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
   const tabs = userRole === "admin" ? adminTabs : navigationTabs;
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 shadow-sm min-h-screen flex flex-col transition-all duration-300 ease-in-out`}>
-      <div className={`${isCollapsed ? 'p-2' : 'p-4'} flex-1 flex flex-col`}>
+    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 shadow-sm h-screen flex flex-col transition-all duration-300 ease-in-out overflow-hidden`}>
+      <div className={`${isCollapsed ? 'p-2' : 'p-4'} flex flex-col overflow-hidden pt-4`}>
         {/* Toggle Button */}
         <div className="flex justify-end mb-4">
           <Button
@@ -117,7 +116,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-1 flex-1">
+        <nav className="space-y-1 flex-1 overflow-hidden">
           {tabs.map((tab) => {
             const IconComponent = tab.icon;
             return (
@@ -143,17 +142,10 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
                 title={isCollapsed ? tab.label : ""}
-              >
-                <IconComponent className="w-4 h-4" />
-                {!isCollapsed && (
-                  <div className="flex items-center gap-2">
-                    <span>{tab.label}</span>
-                    {tab.id === "reports" && (
-                      <Info className="w-3 h-3 text-blue-500" title="Auto-collapses sidebar for better view" />
-                    )}
-                  </div>
-                )}
-              </button>
+                              >
+                  <IconComponent className="w-4 h-4" />
+                  {!isCollapsed && tab.label}
+                </button>
             );
           })}
         </nav>

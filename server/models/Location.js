@@ -30,13 +30,17 @@ const locationSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
+  },
+  address: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true
 });
 
 // Create text indexes for search functionality
-locationSchema.index({ name: "text", code: "text", city_code: "text" });
+locationSchema.index({ name: "text", code: "text", city_code: "text", address: "text" });
 
 // Ensure code is always uppercase
 locationSchema.pre('save', function(next) {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +26,8 @@ export default function Admin() {
     role: "agent"
   });
 
-  // Available locations
-  const locations = ["Hyderabad", "Chennai", "Bangalore", "Kerala", "Mumbai"];
+  // Available locations - will be populated from master data
+  const [locations, setLocations] = useState([]);
 
   // State for master data
   const [cities, setCities] = useState([]);
@@ -35,7 +36,7 @@ export default function Admin() {
 
   // Form state for new entries
   const [newCity, setNewCity] = useState({ name: "", code: "" });
-  const [newLocation, setNewLocation] = useState({ name: "", code: "", city_id: "", city_code: "", status: "active" });
+  const [newLocation, setNewLocation] = useState({ name: "", code: "", city_id: "", city_code: "", status: "active", address: "" });
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", gst_number: "" });
 
   // Unified search state for master data
@@ -77,17 +78,30 @@ export default function Admin() {
   const fetchMasterData = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching master data from:', `${API_BASE_URL}/api/master-data`);
       const response = await fetch(`${API_BASE_URL}/api/master-data`);
+      console.log('📡 Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        setCities(data.cities);
-        setLocationsData(data.locations);
-        setCustomers(data.customers);
+        console.log('📊 Master data received:', data);
+        console.log('🏙️ Cities count:', data.cities?.length || 0);
+        console.log('📍 Locations count:', data.locations?.length || 0);
+        console.log('👥 Customers count:', data.customers?.length || 0);
+        
+        setCities(data.cities || []);
+        setLocationsData(data.locations || []);
+        setCustomers(data.customers || []);
+        
+        // Set locations for agent creation form - combine name and code
+        if (data.locations && data.locations.length > 0) {
+          setLocations(data.locations.map(loc => `${loc.name} (${loc.code})`));
+        }
       } else {
-        console.error('Failed to fetch master data');
+        console.error('❌ Failed to fetch master data:', response.status);
       }
     } catch (error) {
-      console.error('Error fetching master data:', error);
+      console.error('❌ Error fetching master data:', error);
     } finally {
       setLoading(false);
     }
@@ -234,8 +248,10 @@ export default function Admin() {
         const result = await response.json();
         // Immediately update UI by adding the new location to state
         setLocationsData(prevLocations => [...prevLocations, result]);
+        // Also update the locations array for agent creation
+        setLocations(prevLocations => [...prevLocations, `${result.name} (${result.code})`]);
         showModal('Success', 'Location added successfully!', 'success');
-        setNewLocation({ name: "", code: "", city_id: "", city_code: "", status: "active" });
+        setNewLocation({ name: "", code: "", city_id: "", city_code: "", status: "active", address: "" });
       } else {
         const error = await response.json();
         showModal('Error', `Error: ${error.message}`, 'error');
@@ -354,6 +370,15 @@ export default function Admin() {
             location._id === locationId ? { ...location, ...updatedData } : location
           )
         );
+        // Also update the locations array for agent creation
+        setLocations(prevLocations => 
+          prevLocations.map(location => {
+            // Extract name from format "Name (CODE)" for comparison
+            const locationName = location.split(' (')[0];
+            return locationName === updatedData.name ? `${updatedData.name} (${updatedData.code})` : location;
+          })
+        );
+
         showModal('Success', 'Location updated successfully!', 'success');
       } else {
         const error = await response.json();
@@ -380,8 +405,15 @@ export default function Admin() {
           });
 
           if (response.ok) {
+            // Find the location name before deleting to update the locations array
+            const locationToDelete = locationsData.find(loc => loc._id === locationId);
             // Immediately update UI by removing the location from state
             setLocationsData(prevLocations => prevLocations.filter(location => location._id !== locationId));
+            // Also remove from the locations array for agent creation
+            if (locationToDelete) {
+              const locationString = `${locationToDelete.name} (${locationToDelete.code})`;
+              setLocations(prevLocations => prevLocations.filter(location => location !== locationString));
+            }
             showModal('Success', 'Location deleted successfully!', 'success');
           } else {
             const error = await response.json();
@@ -463,6 +495,11 @@ export default function Admin() {
     
     if (!newAgent.name || !newAgent.email || !newAgent.password || !newAgent.location) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    if (locations.length === 0) {
+      showModal('Error', 'No locations available. Please add locations in Master Data first.', 'error');
       return;
     }
 
@@ -583,14 +620,26 @@ export default function Admin() {
     };
   }, [searchTimeout]);
 
-  return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Unified Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole="admin" />
-      
-      {/* Main Content */}
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto">
+  // Debug: Log when cities state changes
+  useEffect(() => {
+    console.log('🏙️ Cities state updated:', cities);
+    console.log('🏙️ Cities count:', cities.length);
+    if (cities.length > 0) {
+      console.log('🏙️ Sample city:', cities[0]);
+    }
+  }, [cities]);
+
+    return (
+    <div className="h-screen flex bg-gray-50">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole="admin" />
+      </div>
+
+      {/* Scrollable Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
@@ -605,7 +654,20 @@ export default function Admin() {
             <CardHeader>
               <CardTitle className="text-xl">Add New Agent</CardTitle>
               <CardDescription>
-                Create a new agent account with location allocation. Note: Agents cannot change their assigned location.
+                Create a new agent account with location allocation. Agents are field operators with limited access to the system. Note: Agents cannot change their assigned location. 
+                {locations.length === 0 && (
+                  <span className="text-orange-600 font-medium block mt-1">
+                    ⚠️ No locations available. Please add locations in Master Data first. 
+                    <button 
+                      type="button" 
+                      onClick={() => setActiveTab("master-data")}
+                      className="text-blue-600 hover:text-blue-800 underline ml-1"
+                    >
+                      Go to Master Data
+                    </button>
+                  </span>
+                )}
+
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -660,39 +722,56 @@ export default function Admin() {
                     <Label htmlFor="location" className="text-sm font-medium text-gray-700">
                       Location *
                     </Label>
-                    <Select
-                      value={newAgent.location}
-                      onValueChange={(value) => setNewAgent({ ...newAgent, location: value })}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((location) => (
-                          <SelectItem key={location} value={location}>
-                            {location}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {locations.length === 0 ? (
+                      <div className="mt-2">
+                        <div className="h-10 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500 flex items-center">
+                          No locations available. Please add locations in Master Data first.
+                        </div>
+                      </div>
+                    ) : (
+                      <Select
+                        value={newAgent.location}
+                        onValueChange={(value) => setNewAgent({ ...newAgent, location: value })}
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder={
+                            loading ? "Loading locations..." : 
+                            "Select location"
+                          } />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {loading ? (
+                            <div className="px-3 py-2 text-sm text-gray-500">
+                              Loading locations...
+                            </div>
+                          ) : (
+                            locations.map((location) => (
+                              <SelectItem key={location} value={location}>
+                                {location}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    
                   </div>
 
-    <div>
+                      <div>
                     <Label htmlFor="role" className="text-sm font-medium text-gray-700">
                       Role
                     </Label>
-                    <Select
-                      value={newAgent.role}
-                      onValueChange={(value) => setNewAgent({ ...newAgent, role: value })}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="agent">Agent</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="role"
+                      type="text"
+                      value="Agent"
+                      className="mt-2 bg-gray-100"
+                      readOnly
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Agents are field operators with limited access
+                    </p>
                   </div>
                 </div>
 
@@ -749,16 +828,12 @@ export default function Admin() {
                           <td className="px-4 py-3 text-gray-600">{agent.email}</td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {agent.location}
+                              {agent.location.toUpperCase()}
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              agent.role === 'admin' 
-                                ? 'bg-purple-100 text-purple-800' 
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {agent.role}
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Agent
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -978,9 +1053,9 @@ export default function Admin() {
                               </div>
                             ) : (
                               <>
-                                <div className="font-medium text-gray-900">{city.name}</div>
-                                <div className="text-sm text-gray-600">Code: {city.code}</div>
-                                <div className="flex gap-2 mt-3">
+                                <div className="font-medium text-gray-900">{city.name.toUpperCase()}</div>
+                                                    <div className="text-sm text-gray-600">Code: {city.code.toUpperCase()}</div>
+                      <div className="flex gap-2 mt-3">
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
@@ -1035,7 +1110,9 @@ export default function Admin() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="locationCity" className="text-sm font-medium text-gray-700">Select City</Label>
+                        <Label htmlFor="locationCity" className="text-sm font-medium text-gray-700">
+                          Select City {cities.length > 0 && `(${cities.length} available)`}
+                        </Label>
                         <Select
                           value={newLocation.city_id}
                           onValueChange={(value) => {
@@ -1047,18 +1124,45 @@ export default function Admin() {
                             });
                           }}
                           required
+                          disabled={cities.length === 0}
                         >
                           <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Choose a city" />
+                            <SelectValue placeholder={
+                              cities.length === 0 ? "No cities available" : 
+                              loading ? "Loading cities..." : 
+                              "Choose a city"
+                            } />
                           </SelectTrigger>
                           <SelectContent>
-                            {cities.map((city) => (
-                              <SelectItem key={city._id} value={city._id}>
-                                {city.name} ({city.code})
+                            {cities.length > 0 ? (
+                              cities.map((city) => (
+                                <SelectItem key={city._id} value={city._id}>
+                                  {city.name.toUpperCase()} ({city.code.toUpperCase()})
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="" disabled>
+                                {loading ? "Loading cities..." : "No cities available"}
                               </SelectItem>
-                            ))}
+                            )}
                           </SelectContent>
                         </Select>
+                        {cities.length === 0 && !loading && (
+                          <p className="text-sm text-orange-600 mt-1">
+                            💡 Add cities in Master Data first to enable location creation
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="locationAddress" className="text-sm font-medium text-gray-700">Address</Label>
+                        <Textarea
+                          id="locationAddress"
+                          placeholder="Enter location address"
+                          value={newLocation.address}
+                          onChange={(e) => setNewLocation({...newLocation, address: e.target.value})}
+                          className="mt-1"
+                          rows={3}
+                        />
                       </div>
                       <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
                         {loading ? "Adding..." : "Add Location"}
@@ -1103,11 +1207,18 @@ export default function Admin() {
                                   <SelectContent>
                                     {cities.map((city) => (
                                       <SelectItem key={city._id} value={city._id}>
-                                        {city.name} ({city.code})
+                                        {city.name.toUpperCase()} ({city.code.toUpperCase()})
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
+                                <Textarea
+                                  placeholder="Location address"
+                                  value={editingLocation.address || ''}
+                                  onChange={(e) => setEditingLocation({...editingLocation, address: e.target.value})}
+                                  className="text-sm"
+                                  rows={2}
+                                />
                                 <div className="flex gap-2">
                                   <Button 
                                     size="sm" 
@@ -1131,9 +1242,12 @@ export default function Admin() {
                               </div>
                             ) : (
                               <>
-                                <div className="font-medium text-gray-900">{location.name}</div>
-                                <div className="text-sm text-gray-600">Code: {location.code}</div>
+                                <div className="font-medium text-gray-900">{location.name.toUpperCase()}</div>
+                                <div className="text-sm text-gray-600">Code: {location.code.toUpperCase()}</div>
                                 <div className="text-sm text-gray-600">City: {location.city_id?.name || 'N/A'}</div>
+                                {location.address && (
+                                  <div className="text-sm text-gray-600">Address: {location.address}</div>
+                                )}
                                 <div className="flex gap-2 mt-3">
                                   <Button 
                                     size="sm" 
@@ -1343,6 +1457,7 @@ export default function Admin() {
             </Card>
           </div>
         )}
+          </div>
         </div>
       </div>
       

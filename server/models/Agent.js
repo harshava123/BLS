@@ -20,7 +20,7 @@ const agentSchema = new mongoose.Schema({
   location: {
     type: String,
     required: true,
-    enum: ['Hyderabad', 'Chennai', 'Bangalore', 'Kerala', 'Mumbai']
+    trim: true
   },
   role: {
     type: String,
