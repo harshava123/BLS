@@ -295,7 +295,7 @@ export default function LocationBookings({ showReports = false }) {
   return (
     <div className="p-6 space-y-6">
       {/* Debug Info - Always show for now */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+      {/* <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
         <h3 className="text-sm font-medium text-yellow-800 mb-2">Debug Info</h3>
         <div className="text-xs text-yellow-700 space-y-1">
           <div><strong>Agent Location:</strong> {agentLocation || 'Not set'}</div>
@@ -303,7 +303,7 @@ export default function LocationBookings({ showReports = false }) {
           <div><strong>Filtered Bookings:</strong> {filteredBookings.length}</div>
           <div><strong>Show Reports:</strong> {showReports ? 'Yes' : 'No'}</div>
         </div>
-      </div>
+      </div> */}
 
       {/* Header */}
       <div className="flex items-center justify-between">

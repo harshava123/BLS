@@ -43,13 +43,13 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
   const navigationTabs = [
     { id: "booking", label: "Booking", icon: Package },
     { id: "location-bookings", label: "Location Bookings", icon: FileText },
-    { id: "reports", label: "Reports", icon: BarChart3 },
-    { id: "loading", label: "Loading Sheet", icon: FileText },
-    { id: "upcoming", label: "Upcoming", icon: Calendar },
-    { id: "delivery", label: "Delivery", icon: Truck },
-    { id: "abstract", label: "Abstract Daily Booking", icon: FileText },
-    { id: "invoice", label: "Invoice", icon: FileText },
-    { id: "search", label: "In Search", icon: Package }
+    // { id: "reports", label: "Reports", icon: BarChart3 },
+    // { id: "loading", label: "Loading Sheet", icon: FileText },
+    // { id: "upcoming", label: "Upcoming", icon: Calendar },
+    // { id: "delivery", label: "Delivery", icon: Truck },
+    // { id: "abstract", label: "Abstract Daily Booking", icon: FileText },
+    // { id: "invoice", label: "Invoice", icon: FileText },
+    // { id: "search", label: "In Search", icon: Package }
   ];
 
   const adminTabs = [

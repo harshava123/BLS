@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import Sidebar from "@/components/layout/Sidebar";
 import LocationBookings from "./LocationBookings";
-import { Package, FileText, Calendar, Truck, BarChart3, Search, MapPin, AlertTriangle, Plus, X, Copy, User } from "lucide-react";
+import { Package, FileText, Calendar, Truck, BarChart3, Search, MapPin, AlertTriangle, Plus, X, Copy, User, CheckCircle } from "lucide-react";
 import { API_BASE_URL } from "@/config";
+import { validatePhoneNumber, formatPhoneNumber } from "@/lib/utils";
 
 export default function Agent() {
   const [activeTab, setActiveTab] = useState("booking");
@@ -108,6 +109,12 @@ export default function Agent() {
   const [searchQuery, setSearchQuery] = useState(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState(null);
   const [customerSearchQueryReceiver, setCustomerSearchQueryReceiver] = useState(null);
+
+  // Phone validation state
+  const [phoneValidation, setPhoneValidation] = useState({
+    sender: { isValid: true, error: null, touched: false },
+    receiver: { isValid: true, error: null, touched: false }
+  });
 
   // Generate next LR number using state to ensure proper updates
   const generateLRNumber = useCallback(() => {
@@ -210,6 +217,19 @@ export default function Agent() {
       sender: { ...prev.sender, [field]: value }
     }));
 
+    // Phone validation
+    if (field === 'phone') {
+      const validation = validatePhoneNumber(value);
+      setPhoneValidation(prev => ({
+        ...prev,
+        sender: {
+          isValid: validation.isValid,
+          error: validation.error,
+          touched: true
+        }
+      }));
+    }
+
     // Auto-update customer in database if it exists and fields are complete
     if (bookingData.sender.customer_id && field !== 'gst_number') {
       const updatedSender = { ...bookingData.sender, [field]: value };
@@ -230,6 +250,19 @@ export default function Agent() {
       ...prev,
       receiver: { ...prev.receiver, [field]: value }
     }));
+
+    // Phone validation
+    if (field === 'phone') {
+      const validation = validatePhoneNumber(value);
+      setPhoneValidation(prev => ({
+        ...prev,
+        receiver: {
+          isValid: validation.isValid,
+          error: validation.error,
+          touched: true
+        }
+      }));
+    }
 
     // Auto-update customer in database if it exists and fields are complete
     if (bookingData.receiver.customer_id && field !== 'gst_number') {
@@ -282,6 +315,24 @@ export default function Agent() {
       ...prev,
       receiver: { ...prev.sender }
     }));
+    
+    // Copy phone validation state as well
+    setPhoneValidation(prev => ({
+      ...prev,
+      receiver: prev.sender
+    }));
+  };
+
+  const handlePhoneInput = (type, value) => {
+    // Format phone number as user types
+    const formatted = formatPhoneNumber(value);
+    
+    // Update the appropriate field
+    if (type === 'sender') {
+      handleSenderChange('phone', formatted);
+    } else {
+      handleReceiverChange('phone', formatted);
+    }
   };
 
   // Calculate totals
@@ -331,6 +382,29 @@ export default function Agent() {
     // Get current user info
     const authUser = localStorage.getItem("auth_user");
     const user = authUser ? JSON.parse(authUser) : null;
+
+    // Validate phone numbers
+    const senderPhoneValidation = validatePhoneNumber(bookingData.sender.phone);
+    const receiverPhoneValidation = validatePhoneNumber(bookingData.receiver.phone);
+    
+    if (!senderPhoneValidation.isValid || !receiverPhoneValidation.isValid) {
+      // Update validation state to show errors
+      setPhoneValidation({
+        sender: {
+          isValid: senderPhoneValidation.isValid,
+          error: senderPhoneValidation.error,
+          touched: true
+        },
+        receiver: {
+          isValid: receiverPhoneValidation.isValid,
+          error: receiverPhoneValidation.error,
+          touched: true
+        }
+      });
+      
+      alert('Please fix phone number validation errors before submitting');
+      return;
+    }
     
     // Validate required fields including from_location
     if (!bookingData.from_location.location_id || !bookingData.from_location.name || !bookingData.from_location.code) {
@@ -606,6 +680,13 @@ export default function Agent() {
           
           // Reset form but preserve from_location (agent's location)
           const currentFromLocation = bookingData.from_location;
+          
+          // Reset phone validation state
+          setPhoneValidation({
+            sender: { isValid: true, error: null, touched: false },
+            receiver: { isValid: true, error: null, touched: false }
+          });
+          
           setBookingData({
             lr_type: "to_pay",
             from_location: {
@@ -1620,15 +1701,24 @@ export default function Agent() {
                       </div>
                       
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700">Mobile No</Label>
-                    <Input
+                        <Label className="text-sm font-semibold text-gray-700">Mobile No *</Label>
+                        <Input
                           placeholder="10 digit mobile number"
                           value={bookingData.sender.phone}
-                          onChange={(e) => handleSenderChange('phone', e.target.value)}
-                          className="h-11 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
+                          onChange={(e) => handlePhoneInput('sender', e.target.value)}
+                          className={`h-11 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                            phoneValidation.sender.touched && !phoneValidation.sender.isValid 
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                              : ''
+                          }`}
+                          required
+                        />
+                        {phoneValidation.sender.touched && !phoneValidation.sender.isValid && (
+                          <p className="text-sm text-red-600 mt-1">
+                            {phoneValidation.sender.error}
+                          </p>
+                        )}
+                      </div>
                       
                       <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700">GST Number</Label>
@@ -1828,15 +1918,24 @@ export default function Agent() {
                       </div>
                       
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700">Mobile No</Label>
-                    <Input
+                        <Label className="text-sm font-semibold text-gray-700">Mobile No *</Label>
+                        <Input
                           placeholder="10 digit mobile number"
                           value={bookingData.receiver.phone}
-                          onChange={(e) => handleReceiverChange('phone', e.target.value)}
-                          className="h-11 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
-                      required
-                    />
-                  </div>
+                          onChange={(e) => handlePhoneInput('receiver', e.target.value)}
+                          className={`h-11 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500 ${
+                            phoneValidation.receiver.touched && !phoneValidation.receiver.isValid 
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                              : ''
+                          }`}
+                          required
+                        />
+                        {phoneValidation.receiver.touched && !phoneValidation.receiver.isValid && (
+                          <p className="text-sm text-red-600 mt-1">
+                            {phoneValidation.receiver.error}
+                          </p>
+                        )}
+                      </div>
                       
                       <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700">GST Number</Label>
