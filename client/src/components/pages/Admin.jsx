@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,12 +10,16 @@ import { Modal } from "@/components/ui/modal";
 import Sidebar from "@/components/layout/Sidebar";
 import Reports from "@/components/pages/Reports";
 import { API_BASE_URL } from "@/config";
-import { User, Users, BarChart3, FileText } from "lucide-react";
+import { User, Users, BarChart3, FileText, MapPin, Search } from "lucide-react";
 
 export default function Admin() {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("add-agent");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Form state for adding new agent
   const [newAgent, setNewAgent] = useState({
@@ -792,86 +796,212 @@ export default function Admin() {
         {activeTab === "manage-agents" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Manage Agents</CardTitle>
-              <CardDescription>
-                View, edit, and manage existing agents. Location assignments are fixed and cannot be changed by agents.
-              </CardDescription>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Manage Agents</CardTitle>
+                  <CardDescription>
+                    View, edit, and manage existing agents. Location assignments are fixed and cannot be changed by agents.
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600">Loading agents...</p>
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-3 text-gray-600 font-medium">Loading agents...</p>
                 </div>
               ) : agents.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No agents found. Add your first agent above.</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 font-medium">No agents found</p>
+                  <p className="text-sm text-gray-400 mt-1">Add your first agent above to get started</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Location</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Created</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {agents.map((agent) => (
-                        <tr key={agent._id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{agent.name}</td>
-                          <td className="px-4 py-3 text-gray-600">{agent.email}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {agent.location.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <div className="space-y-4">
+                  {/* Table */}
+                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                          <tr>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                               Agent
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              agent.isActive 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {agent.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {new Date(agent.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex space-x-2">
-                              <Button
-                                size="sm"
-                                variant={agent.isActive ? "destructive" : "default"}
-                                onClick={() => handleToggleStatus(agent._id, agent.isActive)}
-                                className="text-xs"
-                              >
-                                {agent.isActive ? 'Deactivate' : 'Activate'}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleDeleteAgent(agent._id)}
-                                className="text-xs"
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Location
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Created
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {agents
+                            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                            .map((agent) => (
+                            <tr key={agent._id} className="hover:bg-gray-50/50 transition-colors duration-150">
+                              <td className="px-3 py-3">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                                    <span className="text-xs font-bold text-white">
+                                      {agent.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="ml-3">
+                                    <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
+                                    <div className="text-xs text-gray-500">ID: {agent._id.slice(-6)}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="text-sm text-gray-900 truncate max-w-[180px]" title={agent.email}>
+                                  {agent.email}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                  <MapPin className="w-3 h-3 mr-1" />
+                                  {agent.location.toUpperCase()}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                                  agent.isActive 
+                                    ? 'bg-green-100 text-green-800 border-green-200' 
+                                    : 'bg-red-100 text-red-800 border-red-200'
+                                }`}>
+                                  <div className={`w-2 h-2 rounded-full mr-1.5 ${
+                                    agent.isActive ? 'bg-green-500' : 'bg-red-500'
+                                  }`}></div>
+                                  {agent.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="text-sm text-gray-900">
+                                  {new Date(agent.createdAt).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(agent.createdAt).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex items-center space-x-1">
+                                  <Button
+                                    size="sm"
+                                    variant={agent.isActive ? "destructive" : "default"}
+                                    onClick={() => handleToggleStatus(agent._id, agent.isActive)}
+                                    className={`text-xs h-7 px-2 ${
+                                      agent.isActive 
+                                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                        : 'bg-green-600 hover:bg-green-700 text-white'
+                                    }`}
+                                  >
+                                    {agent.isActive ? 'Deactivate' : 'Activate'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteAgent(agent._id)}
+                                    className="text-xs h-7 px-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Pagination */}
+                  {agents.length > itemsPerPage && (
+                    <div className="flex items-center justify-between px-2">
+                      <div className="text-sm text-gray-700">
+                        Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(currentPage * itemsPerPage, agents.length)}
+                        </span>{' '}
+                        of <span className="font-medium">{agents.length}</span> results
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="h-8 px-3"
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.ceil(agents.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              const totalPages = Math.ceil(agents.length / itemsPerPage);
+                              if (totalPages <= 7) return true;
+                              if (page === 1 || page === totalPages) return true;
+                              if (page >= currentPage - 1 && page <= currentPage + 1) return true;
+                              return false;
+                            })
+                            .map((page, index, array) => {
+                              if (index > 0 && array[index - 1] !== page - 1) {
+                                return (
+                                  <span key={`ellipsis-${page}`} className="px-2 text-gray-500">
+                                    ...
+                                  </span>
+                                );
+                              }
+                              return (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(page)}
+                                  className={`h-8 w-8 p-0 ${
+                                    currentPage === page 
+                                      ? 'bg-blue-600 text-white' 
+                                      : 'text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {page}
+                                </Button>
+                              );
+                            })}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(agents.length / itemsPerPage)))}
+                          disabled={currentPage === Math.ceil(agents.length / itemsPerPage)}
+                          className="h-8 px-3"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -882,70 +1012,74 @@ export default function Admin() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-xl">Master Data Management</CardTitle>
-                <CardDescription>
-                  Manage cities, locations, and customers in one centralized location
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Master Data Management</CardTitle>
+                    <CardDescription>
+                      Manage cities, locations, and customers in one centralized location
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
-                    <Input
-                      placeholder="Search across all master data..."
-                      value={masterDataSearch}
-                      onChange={(e) => {
-                        const query = e.target.value;
-                        console.log('Search input changed to:', query); // Debug log
-                        setMasterDataSearch(query);
-                        
-                        // Clear previous timeout
-                        if (searchTimeout) {
-                          clearTimeout(searchTimeout);
-                        }
-                        
-                        // Set new timeout for debounced search
-                        const newTimeout = setTimeout(() => {
-                          console.log('Search timeout triggered for:', query); // Debug log
-                          if (query.trim()) {
-                            performSearch(query);
-                          } else {
-                            console.log('Empty search, fetching all data'); // Debug log
-                            fetchMasterData(); // Show all data if search is empty
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder="Search across all master data..."
+                        value={masterDataSearch}
+                        onChange={(e) => {
+                          const query = e.target.value;
+                          setMasterDataSearch(query);
+                          
+                          if (searchTimeout) {
+                            clearTimeout(searchTimeout);
                           }
-                        }, 500); // 500ms delay
-                        
-                        setSearchTimeout(newTimeout);
-                      }}
-                      className="w-full"
-                    />
+                          
+                          const newTimeout = setTimeout(() => {
+                            if (query.trim()) {
+                              performSearch(query);
+                            } else {
+                              fetchMasterData();
+                            }
+                          }, 500);
+                          
+                          setSearchTimeout(newTimeout);
+                        }}
+                        className="w-full pl-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    </div>
                   </div>
-                  <Button onClick={() => performSearch(masterDataSearch)} disabled={loading}>
-                    {loading ? "Searching..." : "Search"}
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      console.log('Current data state:', { cities: cities.length, locations: locationsData.length, customers: customers.length });
-                      console.log('Sample cities:', cities.slice(0, 2));
-                      console.log('Sample locations:', locationsData.slice(0, 2));
-                      console.log('Sample customers:', customers.slice(0, 2));
-                    }} 
-                    variant="outline"
-                    className="text-xs"
-                  >
-                    Debug Data
-                  </Button>
-                  <Button onClick={fetchMasterData} variant="outline">
-                    Refresh All
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      setMasterDataSearch("");
-                      fetchMasterData();
-                    }} 
-                    variant="outline"
-                  >
-                    Clear Search
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      onClick={() => performSearch(masterDataSearch)} 
+                      disabled={loading}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {loading ? "Searching..." : "Search"}
+                    </Button>
+                    <Button 
+                      onClick={fetchMasterData} 
+                      variant="outline"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Refresh All
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setMasterDataSearch("");
+                        fetchMasterData();
+                      }} 
+                      variant="outline"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Clear Search
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -954,19 +1088,19 @@ export default function Admin() {
             <Card>
               <CardHeader>
                 <div className="border-b border-gray-200">
-                  <nav className="-mb-px flex space-x-8">
+                  <nav className="-mb-px flex space-x-6">
                     {[
-                      { id: "add-city", label: "Add New City", icon: "🏙️" },
-                      { id: "add-location", label: "Add New Location", icon: "📍" },
-                      { id: "add-customer", label: "Add New Customer", icon: "👤" }
+                      { id: "add-city", label: "Add New City", icon: "🏙️", color: "blue" },
+                      { id: "add-location", label: "Add New Location", icon: "📍", color: "green" },
+                      { id: "add-customer", label: "Add New Customer", icon: "👤", color: "purple" }
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setMasterDataTab(tab.id)}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        className={`py-3 px-4 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg ${
                           masterDataTab === tab.id
-                            ? "border-blue-500 text-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            ? `border-${tab.color}-500 text-${tab.color}-600 bg-${tab.color}-50`
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50"
                         }`}
                       >
                         <span className="mr-2">{tab.icon}</span>
@@ -980,34 +1114,48 @@ export default function Admin() {
                 {/* Add New City Tab */}
                 {masterDataTab === "add-city" && (
                   <div className="space-y-6">
-                    <form onSubmit={handleAddCity} className="space-y-4 max-w-md">
-                      <div>
-                        <Label htmlFor="cityName" className="text-sm font-medium text-gray-700">City Name</Label>
-                        <Input
-                          id="cityName"
-                          placeholder="Enter city name"
-                          value={newCity.name}
-                          onChange={(e) => setNewCity({...newCity, name: e.target.value})}
-                          className="mt-1"
-                          required
-                        />
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-lg">🏙️</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-blue-800">Add New City</h3>
                       </div>
-                      <div>
-                        <Label htmlFor="cityCode" className="text-sm font-medium text-gray-700">City Code (3 digits)</Label>
-                        <Input
-                          id="cityCode"
-                          placeholder="e.g., HYD"
-                          value={newCity.code}
-                          onChange={(e) => setNewCity({...newCity, code: e.target.value.toUpperCase()})}
-                          maxLength={3}
-                          className="mt-1"
-                          required
-                        />
-                      </div>
-                      <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
-                        {loading ? "Adding..." : "Add City"}
-                      </Button>
-                    </form>
+                      <form onSubmit={handleAddCity} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="cityName" className="text-sm font-semibold text-gray-700">City Name</Label>
+                            <Input
+                              id="cityName"
+                              placeholder="Enter city name"
+                              value={newCity.name}
+                              onChange={(e) => setNewCity({...newCity, name: e.target.value})}
+                              className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="cityCode" className="text-sm font-semibold text-gray-700">City Code (3 digits)</Label>
+                            <Input
+                              id="cityCode"
+                              placeholder="e.g., HYD"
+                              value={newCity.code}
+                              onChange={(e) => setNewCity({...newCity, code: e.target.value.toUpperCase()})}
+                              maxLength={3}
+                              className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <Button 
+                          type="submit" 
+                          disabled={loading} 
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5"
+                        >
+                          {loading ? "Adding..." : "Add City"}
+                        </Button>
+                      </form>
+                    </div>
 
                     {/* Cities List */}
                     <div className="border-t pt-6">
@@ -1085,89 +1233,103 @@ export default function Admin() {
                 {/* Add New Location Tab */}
                 {masterDataTab === "add-location" && (
                   <div className="space-y-6">
-                    <form onSubmit={handleAddLocation} className="space-y-4 max-w-md">
-                      <div>
-                        <Label htmlFor="locationName" className="text-sm font-medium text-gray-700">Location Name</Label>
-                        <Input
-                          id="locationName"
-                          placeholder="Enter location name"
-                          value={newLocation.name}
-                          onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
-                          className="mt-1"
-                          required
-                        />
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-lg">📍</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-green-800">Add New Location</h3>
                       </div>
-                      <div>
-                        <Label htmlFor="locationCode" className="text-sm font-medium text-gray-700">Location Code (3 digits)</Label>
-                        <Input
-                          id="locationCode"
-                          placeholder="e.g., BAN"
-                          value={newLocation.code}
-                          onChange={(e) => setNewLocation({...newLocation, code: e.target.value.toUpperCase()})}
-                          maxLength={3}
-                          className="mt-1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="locationCity" className="text-sm font-medium text-gray-700">
-                          Select City {cities.length > 0 && `(${cities.length} available)`}
-                        </Label>
-                        <Select
-                          value={newLocation.city_id}
-                          onValueChange={(value) => {
-                            const city = cities.find(c => c._id === value);
-                            setNewLocation({
-                              ...newLocation, 
-                              city_id: value,
-                              city_code: city?.code || ''
-                            });
-                          }}
-                          required
-                          disabled={cities.length === 0}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder={
-                              cities.length === 0 ? "No cities available" : 
-                              loading ? "Loading cities..." : 
-                              "Choose a city"
-                            } />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cities.length > 0 ? (
-                              cities.map((city) => (
-                                <SelectItem key={city._id} value={city._id}>
-                                  {city.name.toUpperCase()} ({city.code.toUpperCase()})
+                      <form onSubmit={handleAddLocation} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="locationName" className="text-sm font-semibold text-gray-700">Location Name</Label>
+                            <Input
+                              id="locationName"
+                              placeholder="Enter location name"
+                              value={newLocation.name}
+                              onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
+                              className="bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="locationCode" className="text-sm font-semibold text-gray-700">Location Code (3 digits)</Label>
+                            <Input
+                              id="locationCode"
+                              placeholder="e.g., BAN"
+                              value={newLocation.code}
+                              onChange={(e) => setNewLocation({...newLocation, code: e.target.value.toUpperCase()})}
+                              maxLength={3}
+                              className="bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="locationCity" className="text-sm font-semibold text-gray-700">
+                            Select City {cities.length > 0 && `(${cities.length} available)`}
+                          </Label>
+                          <Select
+                            value={newLocation.city_id}
+                            onValueChange={(value) => {
+                              const city = cities.find(c => c._id === value);
+                              setNewLocation({
+                                ...newLocation, 
+                                city_id: value,
+                                city_code: city?.code || ''
+                              });
+                            }}
+                            required
+                            disabled={cities.length === 0}
+                          >
+                            <SelectTrigger className="bg-white border-gray-300 focus:border-green-500 focus:ring-green-500">
+                              <SelectValue placeholder={
+                                cities.length === 0 ? "No cities available" : 
+                                loading ? "Loading cities..." : 
+                                "Choose a city"
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {cities.length > 0 ? (
+                                cities.map((city) => (
+                                  <SelectItem key={city._id} value={city._id}>
+                                    {city.name.toUpperCase()} ({city.code.toUpperCase()})
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="" disabled>
+                                  {loading ? "Loading cities..." : "No cities available"}
                                 </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value="" disabled>
-                                {loading ? "Loading cities..." : "No cities available"}
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                        {cities.length === 0 && !loading && (
-                          <p className="text-sm text-orange-600 mt-1">
-                            💡 Add cities in Master Data first to enable location creation
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="locationAddress" className="text-sm font-medium text-gray-700">Address</Label>
-                        <Textarea
-                          id="locationAddress"
-                          placeholder="Enter location address"
-                          value={newLocation.address}
-                          onChange={(e) => setNewLocation({...newLocation, address: e.target.value})}
-                          className="mt-1"
-                          rows={3}
-                        />
-                      </div>
-                      <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
-                        {loading ? "Adding..." : "Add Location"}
-                      </Button>
-                    </form>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {cities.length === 0 && !loading && (
+                            <p className="text-sm text-orange-600 mt-2 bg-orange-50 px-3 py-2 rounded-lg">
+                              💡 Add cities in Master Data first to enable location creation
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="locationAddress" className="text-sm font-semibold text-gray-700">Address</Label>
+                          <Textarea
+                            id="locationAddress"
+                            placeholder="Enter location address"
+                            value={newLocation.address}
+                            onChange={(e) => setNewLocation({...newLocation, address: e.target.value})}
+                            className="bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
+                            rows={3}
+                          />
+                        </div>
+                        <Button 
+                          type="submit" 
+                          disabled={loading} 
+                          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5"
+                        >
+                          {loading ? "Adding..." : "Add Location"}
+                        </Button>
+                      </form>
+                    </div>
 
                     {/* Locations List */}
                     <div className="border-t pt-6">
@@ -1278,54 +1440,68 @@ export default function Admin() {
                 {/* Add New Customer Tab */}
                 {masterDataTab === "add-customer" && (
                   <div className="space-y-6">
-                    <form onSubmit={handleAddCustomer} className="space-y-4 max-w-md">
-                      <div>
-                        <Label htmlFor="customerName" className="text-sm font-medium text-gray-700">Full Name</Label>
-                        <Input
-                          id="customerName"
-                          placeholder="Enter customer name"
-                          value={newCustomer.name}
-                          onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
-                          className="mt-1"
-                          required
-                        />
+                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-lg">👤</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-purple-800">Add New Customer</h3>
                       </div>
-                      <div>
-                        <Label htmlFor="customerPhone" className="text-sm font-medium text-gray-700">Phone Number</Label>
-                        <Input
-                          id="customerPhone"
-                          placeholder="Enter phone number"
-                          value={newCustomer.phone}
-                          onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
-                          className="mt-1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="customerAddress" className="text-sm font-medium text-gray-700">Address</Label>
-                        <Textarea
-                          id="customerAddress"
-                          placeholder="Enter full address"
-                          value={newCustomer.address}
-                          onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
-                          className="mt-1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="customerGST" className="text-sm font-medium text-gray-700">GST Number (Optional)</Label>
-                        <Input
-                          id="customerGST"
-                          placeholder="Enter GST number"
-                          value={newCustomer.gst_number}
-                          onChange={(e) => setNewCustomer({...newCustomer, gst_number: e.target.value.toUpperCase()})}
-                          className="mt-1"
-                        />
-                      </div>
-                      <Button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
-                        {loading ? "Adding..." : "Add Customer"}
-                      </Button>
-                    </form>
+                      <form onSubmit={handleAddCustomer} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="customerName" className="text-sm font-semibold text-gray-700">Full Name</Label>
+                            <Input
+                              id="customerName"
+                              placeholder="Enter customer name"
+                              value={newCustomer.name}
+                              onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                              className="bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="customerPhone" className="text-sm font-semibold text-gray-700">Phone Number</Label>
+                            <Input
+                              id="customerPhone"
+                              placeholder="Enter phone number"
+                              value={newCustomer.phone}
+                              onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                              className="bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="customerAddress" className="text-sm font-semibold text-gray-700">Address</Label>
+                          <Textarea
+                            id="customerAddress"
+                            placeholder="Enter full address"
+                            value={newCustomer.address}
+                            onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                            className="bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="customerGST" className="text-sm font-semibold text-gray-700">GST Number (Optional)</Label>
+                          <Input
+                            id="customerGST"
+                            placeholder="Enter GST number"
+                            value={newCustomer.gst_number}
+                            onChange={(e) => setNewCustomer({...newCustomer, gst_number: e.target.value.toUpperCase()})}
+                            className="bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                          />
+                        </div>
+                        <Button 
+                          type="submit" 
+                          disabled={loading} 
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5"
+                        >
+                          {loading ? "Adding..." : "Add Customer"}
+                        </Button>
+                      </form>
+                    </div>
 
                     {/* Customers List */}
                     <div className="border-t pt-6">

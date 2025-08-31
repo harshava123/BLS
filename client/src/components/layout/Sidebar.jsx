@@ -6,12 +6,12 @@ import {
   Calendar, 
   FileText, 
   BarChart3, 
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" }) {
   const [user, setUser] = useState(null);
@@ -62,104 +62,100 @@ export default function Sidebar({ activeTab, setActiveTab, userRole = "agent" })
   const tabs = userRole === "admin" ? adminTabs : navigationTabs;
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 shadow-sm h-screen flex flex-col transition-all duration-300 ease-in-out overflow-hidden`}>
-      <div className={`${isCollapsed ? 'p-2' : 'p-4'} flex flex-col overflow-hidden pt-4`}>
-        {/* Toggle Button */}
-        <div className="flex justify-end mb-4">
+    <div className={cn(
+      "flex h-screen border-r border-gray-200 bg-white shadow-sm transition-all duration-300 ease-in-out",
+      isCollapsed ? "w-16" : "w-64"
+    )}>
+      <div className="flex w-full flex-col gap-2">
+        {/* Header */}
+        <div className="flex h-14 items-center border-b border-gray-200 px-2">
+          <div className="flex items-center gap-2 px-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+              <span className="text-sm font-bold text-white">BLS</span>
+            </div>
+            {!isCollapsed && (
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-gray-800">BALAJI LORRY SERVICE</span>
+                <span className="text-xs text-gray-500">Logistics System</span>
+              </div>
+            )}
+          </div>
           <Button
-            onClick={toggleSidebar}
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 hover:bg-gray-100"
+            onClick={toggleSidebar}
+            className="ml-auto h-8 w-8 p-0 hover:bg-gray-100"
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
 
-        {/* Brand Header */}
-        <div className={`${isCollapsed ? 'text-center' : 'text-center'} mb-6`}>
-          <div className="flex items-center justify-center mb-3">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-md relative">
-              {/* Custom container-only truck icon */}
-              <div className="w-8 h-6 bg-white rounded-sm relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm text-blue-600 font-bold">BLS</span>
-                </div>
+        {/* User Welcome */}
+        {user && (
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-medium text-white">
+                {user.name.charAt(0).toUpperCase()}
               </div>
-            </div>
-          </div>
-          {!isCollapsed && (
-            <>
-              <h1 className="text-lg font-bold text-gray-800">BALAJI LORRY SERVICE</h1>
-              <p className="text-xs text-gray-500">Logistics Management System</p>
-              <p className="text-xs text-gray-400 mt-1">on track on time</p>
-            </>
-          )}
-        </div>
-
-        {/* User Info */}
-        <div className={`mb-6 ${isCollapsed ? 'p-2' : 'p-3'} bg-gray-50 rounded-lg`}>
-          {user && (
-            <div className={`${isCollapsed ? 'text-center' : 'text-sm'}`}>
-              {!isCollapsed ? (
-                <>
-                  <span className="text-gray-600">welcome</span>
-                  <span className="ml-1 font-semibold text-gray-800">{user.name}</span>
-                </>
-              ) : (
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-white text-xs font-bold">{user.name.charAt(0).toUpperCase()}</span>
+              {!isCollapsed && (
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500">Welcome</span>
+                  <span className="text-sm font-medium text-gray-800">{user.name}</span>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Navigation */}
-        <nav className="space-y-1 flex-1 overflow-hidden">
+        <nav className="grid gap-1 px-2">
           {tabs.map((tab) => {
             const IconComponent = tab.icon;
+            const isActive = activeTab === tab.id;
+            
             return (
-              <button
+              <Button
                 key={tab.id}
+                variant="ghost"
+                className={cn(
+                  "justify-start h-9 px-2",
+                  isActive 
+                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-600" 
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                  isCollapsed && "h-9 w-9 p-0"
+                )}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  // Auto-collapse sidebar when Reports is clicked
                   if (tab.id === "reports") {
                     setIsCollapsed(true);
                     localStorage.setItem('sidebar_collapsed', 'true');
-                  } else {
-                    // Auto-expand sidebar for other tabs for better navigation
-                    if (isCollapsed) {
-                      setIsCollapsed(false);
-                      localStorage.setItem('sidebar_collapsed', 'false');
-                    }
+                  } else if (isCollapsed) {
+                    setIsCollapsed(false);
+                    localStorage.setItem('sidebar_collapsed', 'false');
                   }
                 }}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-600"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-                title={isCollapsed ? tab.label : ""}
-                              >
-                  <IconComponent className="w-4 h-4" />
-                  {!isCollapsed && tab.label}
-                </button>
+              >
+                <IconComponent className="h-4 w-4" />
+                {!isCollapsed && (
+                  <span className="ml-2 text-sm font-medium">{tab.label}</span>
+                )}
+              </Button>
             );
           })}
         </nav>
 
-        {/* Logout Button */}
-        <div className="pt-4 border-t border-gray-200 mt-auto">
+        {/* Logout */}
+        <div className="mt-auto p-2">
           <Button
-            onClick={handleLogout}
             variant="outline"
             size="sm"
-            className={`${isCollapsed ? 'w-8 h-8 p-0' : 'w-full h-8'} text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400`}
-            title={isCollapsed ? "Logout" : ""}
+            onClick={handleLogout}
+            className={cn(
+              "w-full justify-start text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400",
+              isCollapsed && "h-9 w-9 p-0"
+            )}
           >
-            <LogOut className="w-3 h-3" />
+            <LogOut className="h-4 w-4" />
             {!isCollapsed && <span className="ml-2">Logout</span>}
           </Button>
         </div>
