@@ -33,6 +33,7 @@ app.use('/api/cities', require('./routes/cities'));
 app.use('/api/locations', require('./routes/locations'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/master-data', require('./routes/masterData'));
+app.use('/api/agents', require('./routes/agents'));
 
 // Cleanup endpoint for database maintenance
 app.post('/api/cleanup/cities', async (req, res) => {
@@ -117,4 +118,5 @@ app.listen(PORT, () => {
   console.log(`   - Locations: http://localhost:${PORT}/api/locations`);
   console.log(`   - Customers: http://localhost:${PORT}/api/customers`);
   console.log(`   - Master Data: http://localhost:${PORT}/api/master-data`);
+  console.log(`   - Agents: http://localhost:${PORT}/api/agents`);
 });

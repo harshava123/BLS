@@ -57,7 +57,7 @@ export default function Header() {
             {/* Company Logo & Name */}
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-                <Truck className="w-5 h-5 text-white" />
+                <span className="text-white font-bold text-sm">BLS</span>
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-800">

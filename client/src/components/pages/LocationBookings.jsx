@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,35 @@ export default function LocationBookings() {
   const [dateFilter, setDateFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [agents, setAgents] = useState({}); // Store agent information by ID
+  const [defaultAgentName, setDefaultAgentName] = useState(''); // Store the default agent name
+
+  // Fetch agent information by ID
+  const fetchAgentInfo = useCallback(async (agentId) => {
+    if (!agentId || agents[agentId]) return; // Skip if already fetched or no ID
+    
+    try {
+      console.log('Fetching agent info for ID:', agentId);
+      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}`);
+      if (response.ok) {
+        const agentData = await response.json();
+        console.log('Agent data received:', agentData);
+        setAgents(prev => ({
+          ...prev,
+          [agentId]: agentData
+        }));
+        
+        // If this is the default agent ID, store the name separately
+        if (agentId === '68b4cb6fa273ad5dc722e3e6') {
+          setDefaultAgentName(agentData.name || '');
+        }
+      } else {
+        console.error('Failed to fetch agent info:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching agent info:', error);
+    }
+  }, [agents]);
 
   // Fetch agent's location and bookings
   useEffect(() => {
@@ -71,6 +100,9 @@ export default function LocationBookings() {
             await fetchLocationBookings(locationName);
           }
         }
+        
+        // Also fetch the specific agent with ID 68b4cb6fa273ad5dc722e3e6 to get the default name
+        await fetchAgentInfo('68b4cb6fa273ad5dc722e3e6');
       } catch (error) {
         console.error('Error fetching agent location:', error);
       } finally {
@@ -79,7 +111,7 @@ export default function LocationBookings() {
     };
 
     fetchAgentLocationAndBookings();
-  }, []);
+  }, [fetchAgentInfo]); // Add fetchAgentInfo as dependency
 
   const fetchLocationBookings = async (locationName) => {
     try {
@@ -120,6 +152,17 @@ export default function LocationBookings() {
         
         setBookings(locationBookings);
         setFilteredBookings(locationBookings);
+        
+        // Fetch agent information for all bookings
+        locationBookings.forEach(booking => {
+          console.log('Booking agent_id:', booking.agent_id);
+          if (booking.agent_id) {
+            fetchAgentInfo(booking.agent_id);
+          } else {
+            // If no agent_id, this booking will use the default agent name
+            console.log('No agent_id found, will use default agent name');
+          }
+        });
       }
     } catch (error) {
       console.error('Error fetching location bookings:', error);
@@ -399,7 +442,7 @@ export default function LocationBookings() {
                          <div className="flex items-center gap-2">
                            <User className="w-4 h-4 text-gray-600" />
                            <span className="text-sm font-medium text-gray-900">
-                             {booking.agent_name || 'N/A'}
+                             {agents[booking.agent_id]?.name || defaultAgentName || 'N/A'}
                            </span>
                          </div>
                        </TableCell>

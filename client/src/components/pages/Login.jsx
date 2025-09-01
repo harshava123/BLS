@@ -150,7 +150,7 @@ export default function Login() {
       <div className="w-1/2 bg-blue-600 flex items-center justify-center p-8">
         <div className="text-center text-white">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-lg mb-6">
-            <Truck className="w-8 h-8 text-white" />
+            <span className="text-white font-bold text-2xl">BLS</span>
           </div>
           <h1 className="text-2xl font-bold mb-2">
             BALAJI LORRY SERVICE

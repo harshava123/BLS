@@ -10,6 +10,7 @@ import LocationBookings from "./LocationBookings";
 import { Package, FileText, Calendar, Truck, BarChart3, Search, MapPin, AlertTriangle, Plus, X, Copy, User, CheckCircle } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 import { validatePhoneNumber, formatPhoneNumber } from "@/lib/utils";
+import { TransportReceipt } from "@/components/transport-receipt";
 
 export default function Agent() {
   const [activeTab, setActiveTab] = useState("booking");
@@ -781,6 +782,27 @@ export default function Agent() {
     return parseFloat(amount).toFixed(2).replace(/\.?0+$/, '');
   };
 
+  // Helper function to convert numbers to words
+  const getNumberInWords = (num) => {
+    if (num === 0) return "ZERO";
+    
+    const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const teens = ['TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+    
+    if (num < 10) return ones[num];
+    if (num < 20) return teens[num - 10];
+    if (num < 100) {
+      if (num % 10 === 0) return tens[Math.floor(num / 10)];
+      return tens[Math.floor(num / 10)] + ' ' + ones[num % 10];
+    }
+    if (num < 1000) {
+      if (num % 100 === 0) return ones[Math.floor(num / 100)] + ' HUNDRED';
+      return ones[Math.floor(num / 100)] + ' HUNDRED AND ' + getNumberInWords(num % 100);
+    }
+    return num.toString();
+  };
+
   // Print LR function
   const printLR = () => {
     const printContent = document.getElementById('lr-print-content');
@@ -834,9 +856,76 @@ export default function Agent() {
               .rounded { border-radius: 0.25rem; }
               .inline-block { display: inline-block; }
               .hidden { display: none; }
+              
+              /* Print styles to ensure BOTH copies fit on a single page and do not split */
               @media print {
-                body { margin: 0; }
+                @page {
+                  size: A4;
+                  margin: 8mm;
+                }
+                
+                body { 
+                  margin: 0; 
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                
                 .lr-content { max-width: none; }
+                
+                /* Prevent breaking individual receipt cards across pages */
+                .avoid-break {
+                  break-inside: avoid;
+                  page-break-inside: avoid;
+                }
+                
+                /* keep the two receipts together but do NOT force an extra trailing blank page */
+                .print-page {
+                  break-after: auto;
+                  page-break-after: auto;
+                }
+                
+                /* scale down the pair to guarantee they fit on one sheet */
+                .print-fit {
+                  transform: scale(0.94);
+                  transform-origin: top left;
+                  /* compensate width so scaled content doesn't clip */
+                  width: calc(100% / 0.94);
+                }
+                
+                /* Compact the receipt slightly for better fit */
+                .receipt-card {
+                  padding: 4px;
+                  font-size: 10px;
+                }
+                
+                /* globally tighten line-height inside receipt to conserve vertical space */
+                .receipt-card * {
+                  line-height: 1.25;
+                }
+                
+                /* override wide labels to free some width */
+                .receipt-card .min-w-28 {
+                  min-width: 5rem !important;
+                }
+                
+                /* compress common Tailwind margin utilities used in the component */
+                .receipt-card .mt-6 {
+                  margin-top: 0.75rem !important;
+                }
+                .receipt-card .mt-3 {
+                  margin-top: 0.5rem !important;
+                }
+                .receipt-card .mt-2 {
+                  margin-top: 0.375rem !important;
+                }
+                .receipt-card .mt-1 {
+                  margin-top: 0.25rem !important;
+                }
+                
+                /* Reduce gaps between sections inside the receipt for print */
+                .receipt-card .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+                  margin-top: 0.5rem; /* 8px */
+                }
               }
             </style>
           </head>
@@ -2827,163 +2916,99 @@ export default function Agent() {
 
             {/* LR Print Window */}
     <div id="lr-print-content" className="hidden">
-      <div className="max-w-4xl mx-auto p-6 bg-white border-2 border-black font-mono text-sm">
-        {/* Header with Logo and Company Name */}
-        <div className="flex items-center justify-center mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
-              BAL
-            </div>
-            <div className="text-center">
-              <div className="bg-orange-500 text-white px-4 py-1 rounded text-xs font-bold">
-                BALAJI LORRY
-              </div>
-              <div className="bg-orange-500 text-white px-4 py-1 rounded text-xs font-bold mt-1">
-                SERVICE
-              </div>
-            </div>
-          </div>
-        </div>
+              <main className="mx-auto max-w-3xl px-4 py-6">
+                <div className="print-page print-fit avoid-break space-y-6 print:space-y-4">
+                  {/* Receiver Copy */}
+                  <TransportReceipt 
+                    data={{
+                      companyName: "BALAJI LORRY SERVICE",
+                      branchAddress: `Sai Nagar, Kukatpally-500054, Ph.No: 8919322489, 9989674254`,
+                      meta: {
+                        lrNo: currentBooking?.lr_number || "N/A",
+                        dateTime: new Date().toLocaleDateString('en-IN') + " " + new Date().toLocaleTimeString('en-IN'),
+                        copyType: "Receiver Copy",
+                        pkgs: `${currentBooking?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0} (${currentBooking?.items?.map(item => `${item.description}(${item.quantity})`).join(', ') || 'N/A'})`,
+                        toPay: currentBooking?.lr_type === 'to_pay',
+                      },
+                      consignor: {
+                        name: currentBooking?.sender?.name || "N/A",
+                        location: `${currentBooking?.from_location?.name} (${currentBooking?.from_location?.code})`,
+                        invoiceNumber: currentBooking?.sender?.gst_number || "",
+                        gst: currentBooking?.sender?.gst_number || "",
+                      },
+                      consignee: {
+                        name: currentBooking?.receiver?.name || "N/A",
+                        location: `${currentBooking?.to_location?.name} (${currentBooking?.to_location?.code})`,
+                        parcelValue: formatAmount(currentBooking?.charges?.total_amount || 0),
+                        gst: currentBooking?.receiver?.gst_number || "",
+                      },
+                      remarks: [
+                        "Driver Contact: 8686894799",
+                        "Office Contact: 9989674254",
+                        "1) LR Valid for 10 days",
+                        "2) Subject to Hyderabad Jurisdiction",
+                        "3) Company not responsible for Breakage and Leakage",
+                        `4) No. of packages in words: ${getNumberInWords(currentBooking?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0)}`,
+                      ],
+                      deliveryAt: `${currentBooking?.to_location?.name}: ${currentBooking?.to_location?.address || 'No address available'}`,
+                      contact: `${currentBooking?.receiver?.phone || 'N/A'}, 8886648712`,
+                      charges: {
+                        weightActual: formatAmount(currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0) || 0),
+                        weightCharged: formatAmount(currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0) || 0),
+                        freight: formatAmount(currentBooking?.charges?.item_freight_subtotal || 0),
+                        netAmount: formatAmount(currentBooking?.charges?.total_amount || 0),
+                      },
+                    }}
+                  />
 
-        {/* Company Title */}
-        <div className="text-center text-xl font-bold mb-4">
-          BALAJI LORRY SERVICE
-        </div>
+                  {/* Simple separator line */}
+                  <div className="h-px bg-black/60 print:bg-black my-2 print:my-1" />
 
-        {/* Branch Address */}
-        <div className="text-center text-xs mb-4">
-          <div>Branch Address: {currentBooking?.from_location?.name} ({currentBooking?.from_location?.code})</div>
-          <div>{currentBooking?.from_location?.address || 'No address available'}</div>
-          <div>Ph.No: 0-8919322489 , 9989674524</div>
+                  {/* Sender Copy */}
+                  <TransportReceipt
+                    data={{
+                      companyName: "BALAJI LORRY SERVICE",
+                      branchAddress: `Sai Nagar, Kukatpally-500054, Ph.No: 8919322489, 9989674254`,
+                      meta: {
+                        lrNo: currentBooking?.lr_number || "N/A",
+                        dateTime: new Date().toLocaleDateString('en-IN') + " " + new Date().toLocaleTimeString('en-IN'),
+                        copyType: "Sender Copy",
+                        pkgs: `${currentBooking?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0} (${currentBooking?.items?.map(item => `${item.description}(${item.quantity})`).join(', ') || 'N/A'})`,
+                        toPay: currentBooking?.lr_type === 'to_pay',
+                      },
+                      consignor: {
+                        name: currentBooking?.sender?.name || "N/A",
+                        location: `${currentBooking?.from_location?.name} (${currentBooking?.from_location?.code})`,
+                        invoiceNumber: currentBooking?.sender?.gst_number || "",
+                        gst: currentBooking?.sender?.gst_number || "",
+                      },
+                      consignee: {
+                        name: currentBooking?.receiver?.name || "N/A",
+                        location: `${currentBooking?.to_location?.name} (${currentBooking?.to_location?.code})`,
+                        parcelValue: formatAmount(currentBooking?.charges?.total_amount || 0),
+                        gst: currentBooking?.receiver?.gst_number || "",
+                      },
+                      remarks: [
+                        "Driver Contact: 8686894799",
+                        "Office Contact: 9989674254",
+                        "1) LR Valid for 10 days",
+                        "2) Subject to Hyderabad Jurisdiction",
+                        "3) Company not responsible for Breakage and Leakage",
+                        `4) No. of packages in words: ${getNumberInWords(currentBooking?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0)}`,
+                      ],
+                      deliveryAt: `${currentBooking?.to_location?.name} (${currentBooking?.to_location?.code}): ${currentBooking?.to_location?.address || 'No address available'}`,
+                      contact: `${currentBooking?.receiver?.phone || 'N/A'}, 8886648712`,
+                      charges: {
+                        weightActual: formatAmount(currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0) || 0),
+                        weightCharged: formatAmount(currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0) || 0),
+                        freight: formatAmount(currentBooking?.charges?.item_freight_subtotal || 0),
+                        netAmount: formatAmount(currentBooking?.charges?.total_amount || 0),
+                      },
+                    }}
+                  />
         </div>
-
-        {/* Receipt Header */}
-        <div className="flex justify-between items-center mb-4 border-b border-black pb-2">
-          <div className="text-xs">
-            <div>Parcel Receipt</div>
-            <div className="font-bold">L.R.No: {currentBooking?.lr_number}</div>
+              </main>
           </div>
-          <div className="text-xs text-center">
-            <div className="font-bold">Date: {new Date().toLocaleDateString('en-IN')} {new Date().toLocaleTimeString('en-IN')}</div>
-          </div>
-          <div className="text-xs text-right">
-            <div className="font-bold">{currentBooking?.lr_type === 'to_pay' ? 'To-Pay' : currentBooking?.lr_type === 'paid' ? 'Paid' : 'On Account'}</div>
-          </div>
-        </div>
-
-        {/* Main Receipt Table */}
-        <table className="w-full border-collapse border-2 border-black text-xs mb-4">
-          <tbody>
-            {/* Row 1: Consignor/Consignee Headers */}
-            <tr>
-              <td className="border border-black p-2 font-bold bg-gray-100">Consignor:</td>
-              <td className="border border-black p-2 font-bold bg-gray-100">Consignee:</td>
-              <td className="border border-black p-2 font-bold bg-gray-100">Receiver Copy</td>
-            </tr>
-            
-            {/* Row 2: Customer Names and Package Details */}
-            <tr>
-              <td className="border border-black p-2">{currentBooking?.sender?.name || 'N/A'}</td>
-              <td className="border border-black p-2">{currentBooking?.receiver?.name || 'N/A'}</td>
-              <td className="border border-black p-2">Pkgs: {currentBooking?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0} ({currentBooking?.items?.map(item => `${item.description}(${item.quantity})`).join(', ') || 'N/A'})</td>
-            </tr>
-            
-            {/* Row 3: From/To Locations */}
-            <tr>
-              <td className="border border-black p-2">
-                From: {currentBooking?.from_location?.name} ({currentBooking?.from_location?.code})
-                <div className="text-xs mt-1">{currentBooking?.from_location?.address || 'No address'}</div>
-              </td>
-              <td className="border border-black p-2">
-                To: {currentBooking?.to_location?.name} ({currentBooking?.to_location?.code})
-                <div className="text-xs mt-1">{currentBooking?.to_location?.address || 'No address'}</div>
-              </td>
-              <td className="border border-black p-2"></td>
-            </tr>
-            
-            {/* Row 4: Invoice Number and Parcel Value */}
-            <tr>
-              <td className="border border-black p-2">Invoice Number: {currentBooking?.sender?.gst_number || ''}</td>
-              <td className="border border-black p-2">Parcel Value: ₹{formatAmount(currentBooking?.charges?.total_amount || 0)}</td>
-              <td className="border border-black p-2"></td>
-            </tr>
-            
-            {/* Row 5: GST Numbers */}
-            <tr>
-              <td className="border border-black p-2">GST Number: {currentBooking?.sender?.gst_number || ''}</td>
-              <td className="border border-black p-2">GST Number: {currentBooking?.receiver?.gst_number || ''}</td>
-              <td className="border border-black p-2"></td>
-            </tr>
-            
-            {/* Row 6: Remark */}
-            <tr>
-              <td className="border border-black p-2" colSpan="2">Remark: {currentBooking?.sender?.address || ''}</td>
-              <td className="border border-black p-2"></td>
-            </tr>
-            
-            {/* Row 7: Terms & Conditions + Weight/Financial Table */}
-            <tr>
-              <td className="border border-black p-2 align-top" colSpan="2">
-                <div className="font-bold mb-2">Terms & Conditions:</div>
-                <div className="text-xs space-y-1">
-                  <div><strong>Customer care No - 8886648719</strong></div>
-                  <div><strong>1) LR Valid for 15 days</strong></div>
-                  <div><strong>Hyderabad kukatpally - 8886648719</strong></div>
-                  <div><strong>2) Booked Owners risk</strong></div>
-                  <div><strong>Hyderabad Begam Bazar- 7330963338</strong></div>
-                  <div><strong>3) Not Responsible for Breakage and Leakages</strong></div>
-                  <div><strong>Hyderabad Katedan -8919322489</strong></div>
-                  <div><strong>4) PAN NO: ACZPY9785F</strong></div>
-                  <div className="mt-2"><strong>TRANSPORT ID: 36ACZPY9785F1Z7</strong></div>
-                </div>
-              </td>
-              <td className="border border-black p-2 align-top">
-                <table className="w-full text-xs">
-                  <tr>
-                    <td className="font-bold">Weight</td>
-                    <td className="text-right">Actual Wt:</td>
-                    <td className="text-right">{currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0).toFixed(2) || '0.00'}</td>
-                  </tr>
-                  <tr>
-                    <td></td>
-                    <td className="text-right">Charged Wt:</td>
-                    <td className="text-right">{currentBooking?.items?.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0).toFixed(2) || '0.00'}</td>
-                  </tr>
-                  <tr>
-                    <td className="font-bold border-t border-black pt-2">Freight</td>
-                    <td className="text-right border-t border-black pt-2"></td>
-                    <td className="text-right border-t border-black pt-2">₹{formatAmount(currentBooking?.charges?.item_freight_subtotal || 0)}</td>
-                  </tr>
-                  <tr>
-                    <td className="font-bold border-t border-black pt-2">Net Amt Payable</td>
-                    <td className="text-right border-t border-black pt-2"></td>
-                    <td className="text-right border-t border-black pt-2 font-bold">₹{formatAmount(currentBooking?.charges?.total_amount || 0)}</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Delivery Address */}
-        <div className="text-xs mb-4 p-2 border border-black">
-          <div>
-            <strong>Delivery at:</strong> {currentBooking?.to_location?.name} ({currentBooking?.to_location?.code}) - {currentBooking?.to_location?.address || 'No address available'}
-          </div>
-          <div className="mt-1">
-            <strong>Receiver Details:</strong> {currentBooking?.receiver?.address} <strong>contact: {currentBooking?.receiver?.phone}, 8886648712</strong>
-          </div>
-        </div>
-
-        {/* Signature Section */}
-        <div className="flex justify-end">
-          <div className="text-xs text-right">
-            <div className="font-bold">Receiver's Signature/Name</div>
-            <div className="h-12 w-40 border-b border-black mt-2"></div>
-          </div>
-        </div>
-      </div>
-    </div>
         </div>
       </div>
     </div>

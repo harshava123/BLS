@@ -204,3 +204,78 @@ button:hover {
     @apply bg-background text-foreground;
   }
 }
+
+/* Print styles to ensure BOTH copies fit on a single page and do not split */
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  a,
+  button {
+    color: black !important;
+    text-decoration: none !important;
+  }
+
+  /* Prevent breaking individual receipt cards across pages */
+  .avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* keep the two receipts together but do NOT force an extra trailing blank page */
+  .print-page {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* scale down the pair to guarantee they fit on one sheet */
+  .print-fit {
+    transform: scale(0.94);
+    transform-origin: top left;
+    /* compensate width so scaled content doesn't clip */
+    width: calc(100% / 0.94);
+  }
+
+  /* Compact the receipt slightly for better fit */
+  .receipt-card {
+    padding: 4px;
+    font-size: 10px;
+  }
+
+  /* globally tighten line-height inside receipt to conserve vertical space */
+  .receipt-card * {
+    line-height: 1.25;
+  }
+
+  /* override wide labels to free some width */
+  .receipt-card .min-w-28 {
+    min-width: 5rem !important;
+  }
+
+  /* compress common Tailwind margin utilities used in the component */
+  .receipt-card .mt-6 {
+    margin-top: 0.75rem !important;
+  }
+  .receipt-card .mt-3 {
+    margin-top: 0.5rem !important;
+  }
+  .receipt-card .mt-2 {
+    margin-top: 0.375rem !important;
+  }
+  .receipt-card .mt-1 {
+    margin-top: 0.25rem !important;
+  }
+
+  /* Reduce gaps between sections inside the receipt for print */
+  .receipt-card .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.5rem; /* 8px */
+  }
+}
