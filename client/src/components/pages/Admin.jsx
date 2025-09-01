@@ -97,7 +97,7 @@ export default function Admin() {
         
         // Set locations for agent creation form - combine name and code
         if (data.locations && data.locations.length > 0) {
-          setLocations(data.locations.map(loc => `${loc.name} (${loc.code})`));
+          setLocations(data.locations.map(loc => `${loc.name.toUpperCase()} (${loc.code.toUpperCase()})`));
         }
       } else {
         console.error('❌ Failed to fetch master data:', response.status);
@@ -251,7 +251,7 @@ export default function Admin() {
         // Immediately update UI by adding the new location to state
         setLocationsData(prevLocations => [...prevLocations, result]);
         // Also update the locations array for agent creation
-        setLocations(prevLocations => [...prevLocations, `${result.name} (${result.code})`]);
+        setLocations(prevLocations => [...prevLocations, `${result.name.toUpperCase()} (${result.code.toUpperCase()})`]);
         showModal('Success', 'Location added successfully!', 'success');
         setNewLocation({ name: "", code: "", city_id: "", city_code: "", status: "active", address: "" });
       } else {
@@ -552,7 +552,7 @@ export default function Admin() {
                       type="text"
                       placeholder="Enter agent name"
                       value={newAgent.name}
-                      onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
+                      onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value.toUpperCase() })}
                       className="mt-2"
                       required
                     />
@@ -995,7 +995,7 @@ export default function Admin() {
                               id="cityName"
                               placeholder="Enter city name"
                               value={newCity.name}
-                              onChange={(e) => setNewCity({...newCity, name: e.target.value})}
+                              onChange={(e) => setNewCity({...newCity, name: e.target.value.toUpperCase()})}
                               className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                               required
                             />
@@ -1120,7 +1120,7 @@ export default function Admin() {
                               id="locationName"
                               placeholder="Enter location name"
                               value={newLocation.name}
-                              onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
+                              onChange={(e) => setNewLocation({...newLocation, name: e.target.value.toUpperCase()})}
                               className="bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
                               required
                             />
@@ -1314,7 +1314,7 @@ export default function Admin() {
                               id="customerName"
                               placeholder="Enter customer name"
                               value={newCustomer.name}
-                              onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                              onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value.toUpperCase()})}
                               className="bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                               required
                             />
@@ -1373,7 +1373,7 @@ export default function Admin() {
                                 <Input
                                   placeholder="Customer name"
                                   value={editingCustomer.name}
-                                  onChange={(e) => setEditingCustomer({...editingCustomer, name: e.target.value})}
+                                  onChange={(e) => setEditingCustomer({...editingCustomer, name: e.target.value.toUpperCase()})}
                                   className="text-sm"
                                 />
                                 <Input

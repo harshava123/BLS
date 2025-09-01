@@ -25,6 +25,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/config";
 import {
   Table,
   TableBody,
@@ -34,9 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const API_BASE_URL = 'http://localhost:8001';
-
-export default function LocationBookings({ showReports = false }) {
+export default function LocationBookings() {
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,17 +63,13 @@ export default function LocationBookings({ showReports = false }) {
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
-                  if (profileData.user && profileData.user.location) {
-          const locationName = profileData.user.location.split(' (')[0];
-          console.log('📍 Agent location from profile:', profileData.user.location);
-          console.log('📍 Extracted location name:', locationName);
-          setAgentLocation(locationName);
-          
-          // Fetch all bookings from this location
-          await fetchLocationBookings(locationName);
-        } else {
-          console.log('⚠️ No location found in agent profile:', profileData.user);
-        }
+          if (profileData.user && profileData.user.location) {
+            const locationName = profileData.user.location.split(' (')[0];
+            setAgentLocation(locationName);
+            
+            // Fetch all bookings from this location
+            await fetchLocationBookings(locationName);
+          }
         }
       } catch (error) {
         console.error('Error fetching agent location:', error);
@@ -88,26 +83,10 @@ export default function LocationBookings({ showReports = false }) {
 
   const fetchLocationBookings = async (locationName) => {
     try {
-      console.log('🔍 Fetching bookings for location:', locationName);
-      console.log('🔍 API URL:', `${API_BASE_URL}/api/bookings`);
-      
       const response = await fetch(`${API_BASE_URL}/api/bookings`);
-      console.log('📡 Response status:', response.status);
       
       if (response.ok) {
         const allBookings = await response.json();
-        console.log('📊 Total bookings fetched:', allBookings.length);
-        
-        // Log sample booking structure
-        if (allBookings.length > 0) {
-          console.log('📋 Sample booking structure:', {
-            lr_number: allBookings[0].lr_number,
-            from_location: allBookings[0].from_location,
-            to_location: allBookings[0].to_location,
-            agent_location: allBookings[0].agent_location,
-            status: allBookings[0].status
-          });
-        }
         
         // Filter bookings by location (both from and to)
         const locationBookings = allBookings.filter(booking => {
@@ -136,43 +115,7 @@ export default function LocationBookings({ showReports = false }) {
             (toLocation && toLocation.toLowerCase().includes(locationName.toLowerCase())) ||
             (agentLocation && agentLocation.toLowerCase().includes(locationName.toLowerCase()));
           
-          // Debug logging for first few bookings
-          if (allBookings.indexOf(booking) < 3) {
-            console.log('🔍 Booking location check:', {
-              lr: booking.lr_number,
-              from: fromLocation,
-              to: toLocation,
-              agent: agentLocation,
-              agentAssigned: locationName,
-              normalizedFrom: normalizedFromLocation,
-              normalizedTo: normalizedToLocation,
-              normalizedAgent: normalizedAgentLocationField,
-              normalizedAgentAssigned: normalizedAgentLocation,
-              isMatch: isLocationMatch
-            });
-          }
-          
           return isLocationMatch;
-        });
-        
-        console.log('📍 Location bookings found:', locationBookings.length);
-        console.log('📍 Sample location booking:', locationBookings[0]);
-        
-        // Log unique locations in the system for debugging
-        const uniqueLocations = [...new Set([
-          ...allBookings.map(b => b.from_location?.name).filter(Boolean),
-          ...allBookings.map(b => b.to_location?.name).filter(Boolean),
-          ...allBookings.map(b => b.agent_location).filter(Boolean)
-        ])];
-        console.log('🌍 Unique locations in system:', uniqueLocations);
-        console.log('🎯 Agent assigned location:', locationName);
-        
-        // Additional debugging: Show all bookings with their locations
-        console.log('📋 All bookings with locations:');
-        allBookings.forEach((booking, index) => {
-          if (index < 5) { // Show first 5 bookings
-            console.log(`  ${index + 1}. LR: ${booking.lr_number}, From: ${booking.from_location?.name}, To: ${booking.to_location?.name}, Agent: ${booking.agent_location}`);
-          }
         });
         
         setBookings(locationBookings);
@@ -294,25 +237,16 @@ export default function LocationBookings({ showReports = false }) {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Debug Info - Always show for now */}
-      {/* <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-        <h3 className="text-sm font-medium text-yellow-800 mb-2">Debug Info</h3>
-        <div className="text-xs text-yellow-700 space-y-1">
-          <div><strong>Agent Location:</strong> {agentLocation || 'Not set'}</div>
-          <div><strong>Total Bookings:</strong> {bookings.length}</div>
-          <div><strong>Filtered Bookings:</strong> {filteredBookings.length}</div>
-          <div><strong>Show Reports:</strong> {showReports ? 'Yes' : 'No'}</div>
-        </div>
-      </div> */}
+
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {showReports ? 'Location Reports' : 'Location Bookings'}
+            Location Bookings & Reports
           </h1>
           <p className="text-gray-600 mt-2">
-            {showReports ? 'Reports and analytics for ' : 'All bookings from '}
+            All bookings from{' '}
             <span className="font-semibold text-blue-600">{agentLocation}</span> location
             {bookings.length > 0 && (
               <span className="ml-2 text-sm text-gray-500">
@@ -327,131 +261,11 @@ export default function LocationBookings({ showReports = false }) {
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Package className="h-8 w-8 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredBookings.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Truck className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Transit</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {filteredBookings.filter(b => b.status === 'in_transit').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-8 w-8 text-yellow-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Today's Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {filteredBookings.filter(b => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const bookingDate = new Date(b.createdAt).toISOString().split('T')[0];
-                    return bookingDate === today;
-                  }).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <User className="h-8 w-8 text-purple-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Agents</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {new Set(filteredBookings.map(b => b.agent_name).filter(Boolean)).size}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Additional Reports Cards when showReports is true */}
-        {showReports && (
-          <>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className="h-8 w-8 text-indigo-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      ₹{filteredBookings.reduce((sum, b) => sum + (parseFloat(b.charges?.total_amount) || 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Package className="h-8 w-8 text-orange-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Delivered</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {filteredBookings.filter(b => b.status === 'delivered').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="h-8 w-8 text-red-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {filteredBookings.filter(b => b.status === 'booked').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-8 w-8 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">This Month</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {filteredBookings.filter(b => {
-                        const today = new Date();
-                        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                        return new Date(b.createdAt) >= monthStart;
-                      }).length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+      
 
       {/* Filters */}
       <Card>
